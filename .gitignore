@@ -33,3 +33,6 @@ next-env.d.ts
 .idea/
 .vscode/*
 !.vscode/launch.json
+
+# supabase cli scratch
+supabase/.temp/

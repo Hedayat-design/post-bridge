@@ -82,7 +82,12 @@ async function uploadMedia(accessToken: string, item: MediaItem): Promise<string
   // Video and GIF are transcoded asynchronously; a tweet referencing an
   // unprocessed media id is rejected, so wait it out.
   let info = finalizeData?.data?.processing_info ?? finalizeData?.processing_info
-  while (info && (info.state === 'pending' || info.state === 'in_progress')) {
+  while (info && info.state !== 'succeeded') {
+    // FINALIZE itself can come back already failed, so check before waiting.
+    if (info.state === 'failed') {
+      throw new Error(info.error?.message ?? 'X media processing failed')
+    }
+
     await new Promise((r) => setTimeout(r, Math.max(1, info.check_after_secs ?? 1) * 1000))
 
     const statusRes = await xFetch(
@@ -93,9 +98,7 @@ async function uploadMedia(accessToken: string, item: MediaItem): Promise<string
     const statusData = await statusRes.json().catch(() => ({}))
     info = statusData?.data?.processing_info ?? statusData?.processing_info
 
-    if (info?.state === 'failed') {
-      throw new Error(info.error?.message ?? 'X media processing failed')
-    }
+    if (!info) break // no processing_info means nothing left to wait for
   }
 
   return mediaId

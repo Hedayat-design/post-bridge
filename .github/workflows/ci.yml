@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        # Dummy values: the build only needs these to be present and
+        # well-formed, never to resolve.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: dummy-service-key
+          STRIPE_SECRET_KEY: sk_test_dummy
+        run: npx next build
+
+  sql:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install pglast
+
+      - name: Validate migrations parse as PostgreSQL
+        run: |
+          python - <<'PY'
+          import sys, glob, pglast
+
+          failed = False
+          for path in sorted(glob.glob('supabase/**/*.sql', recursive=True)):
+              try:
+                  stmts = pglast.parse_sql(open(path, encoding='utf-8').read())
+                  print(f'OK   {path} ({len(stmts)} statements)')
+              except Exception as e:
+                  failed = True
+                  print(f'FAIL {path}\n     {e}')
+          sys.exit(1 if failed else 0)
+          PY
