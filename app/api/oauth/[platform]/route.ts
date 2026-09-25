@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { PLATFORMS, Platform } from '@/lib/platforms'
-import { supabaseServer } from '@/lib/supabase'
+import { supabaseServer } from '@/lib/supabase/server'
+import { createPkcePair, sealState, OAUTH_COOKIE, stateCookieOptions } from '@/lib/oauth'
 
 export async function GET(
   request: NextRequest,
@@ -13,22 +15,41 @@ export async function GET(
   }
 
   const supabase = supabaseServer()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
+  // getUser() verifies the JWT with the auth server; getSession() only reads
+  // the cookie and trusts it.
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
   const clientId = process.env[config.clientIdEnv]
+  if (!clientId) {
+    return NextResponse.redirect(new URL(`/connect?error=${platform}_not_configured`, request.url))
+  }
+
   const redirectUri = `${request.nextUrl.origin}/api/oauth/${platform}/callback`
+  const nonce = crypto.randomBytes(16).toString('hex')
+  const { verifier, challenge } = createPkcePair()
 
   const authUrl = new URL(config.authUrl)
-  authUrl.searchParams.set('client_id', clientId ?? '')
+  authUrl.searchParams.set('client_id', clientId)
   authUrl.searchParams.set('redirect_uri', redirectUri)
-  authUrl.searchParams.set('scope', config.scope)
   authUrl.searchParams.set('response_type', 'code')
-  // state carries the logged-in user's id through the redirect so the callback
-  // knows whose social_accounts row to create
-  authUrl.searchParams.set('state', session.user.id)
+  authUrl.searchParams.set('scope', config.scope)
+  // Only the opaque nonce travels through the provider; the user id stays in
+  // a signed cookie so a forged callback can't target someone else's account.
+  authUrl.searchParams.set('state', nonce)
 
-  return NextResponse.redirect(authUrl.toString())
+  if (config.usesPkce) {
+    authUrl.searchParams.set('code_challenge', challenge)
+    authUrl.searchParams.set('code_challenge_method', 'S256')
+  }
+
+  const response = NextResponse.redirect(authUrl.toString())
+  response.cookies.set(
+    OAUTH_COOKIE,
+    sealState({ nonce, verifier, userId: user.id, platform, issuedAt: Date.now() }),
+    stateCookieOptions()
+  )
+  return response
 }

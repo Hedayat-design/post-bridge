@@ -1,15 +1,18 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabaseBrowser } from '@/lib/supabase'
+import { supabaseBrowser } from '@/lib/supabase/client'
 
 type SocialAccount = { id: string; platform: string; display_name: string | null }
+
+// Keep the user inside the stricter platform's ceiling as they type.
+const TEXT_LIMITS: Record<string, number> = { x: 280, linkedin: 3000 }
 
 export default function ComposePage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [caption, setCaption] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [scheduleAt, setScheduleAt] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
@@ -26,13 +29,19 @@ export default function ComposePage() {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
+  const selectedPlatforms = accounts.filter((a) => selected.includes(a.id)).map((a) => a.platform)
+  const limit = selectedPlatforms.length
+    ? Math.min(...selectedPlatforms.map((p) => TEXT_LIMITS[p] ?? Infinity))
+    : Infinity
+  const overLimit = caption.length > limit
+
   async function handleSubmit() {
     setSubmitting(true)
     setMessage('')
 
-    let mediaUrls: string[] = []
-    if (file) {
-      const path = `${Date.now()}-${file.name}`
+    const mediaUrls: string[] = []
+    for (const file of files) {
+      const path = `${Date.now()}-${crypto.randomUUID()}-${file.name}`
       const { error: uploadError } = await supabase.storage.from('post-media').upload(path, file)
       if (uploadError) {
         setMessage(uploadError.message)
@@ -40,8 +49,11 @@ export default function ComposePage() {
         return
       }
       const { data } = supabase.storage.from('post-media').getPublicUrl(path)
-      mediaUrls = [data.publicUrl]
+      mediaUrls.push(data.publicUrl)
     }
+
+    const hasVideo = files.some((f) => f.type.startsWith('video'))
+    const mediaType = !files.length ? 'text' : hasVideo ? 'video' : files.length > 1 ? 'carousel' : 'image'
 
     const res = await fetch('/api/posts', {
       method: 'POST',
@@ -49,8 +61,10 @@ export default function ComposePage() {
       body: JSON.stringify({
         caption,
         mediaUrls,
-        mediaType: file?.type.startsWith('video') ? 'video' : 'image',
-        scheduledFor: scheduleAt || null,
+        mediaType,
+        // datetime-local yields a naive local string. Converting to a real
+        // instant here is what stops posts firing at the wrong hour.
+        scheduledFor: scheduleAt ? new Date(scheduleAt).toISOString() : null,
         socialAccountIds: selected,
       }),
     })
@@ -71,16 +85,24 @@ export default function ComposePage() {
       <h1 className="text-2xl font-bold mb-6">Upload to Post Bridge</h1>
 
       <label className="block border-2 border-dashed rounded-xl p-8 text-center text-sm text-black/50 cursor-pointer mb-6">
-        {file ? file.name : 'Click to choose an image or video'}
-        <input type="file" accept="image/*,video/*" className="hidden"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        {files.length === 0
+          ? 'Click to choose images or a video'
+          : files.map((f) => f.name).join(', ')}
+        <input
+          type="file" accept="image/*,video/*" multiple className="hidden"
+          onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+        />
       </label>
 
       <textarea
         placeholder="Write a caption…" value={caption}
         onChange={(e) => setCaption(e.target.value)}
-        className="w-full border rounded-xl px-4 py-3 mb-6 h-28"
+        className="w-full border rounded-xl px-4 py-3 mb-1 h-28"
       />
+      <p className={`text-xs mb-6 ${overLimit ? 'text-red-600' : 'text-black/40'}`}>
+        {caption.length}{limit !== Infinity ? ` / ${limit}` : ''} characters
+        {overLimit ? ' — too long for a selected platform' : ''}
+      </p>
 
       <p className="text-sm font-medium mb-2">Post to</p>
       <div className="flex flex-wrap gap-2 mb-6">
@@ -103,16 +125,22 @@ export default function ComposePage() {
       <input
         type="datetime-local" value={scheduleAt}
         onChange={(e) => setScheduleAt(e.target.value)}
-        className="w-full border rounded-xl px-4 py-2.5 mb-6"
+        className="w-full border rounded-xl px-4 py-2.5 mb-2"
       />
+      {scheduleAt && (
+        <p className="text-xs text-black/40 mb-6">
+          Posts at {new Date(scheduleAt).toLocaleString()} ({Intl.DateTimeFormat().resolvedOptions().timeZone})
+        </p>
+      )}
 
-      {message && <p className="text-sm text-red-600 mb-4">{message}</p>}
+      {message && <p className="text-sm text-red-600 mb-4 whitespace-pre-wrap">{message}</p>}
 
       <button
-        onClick={handleSubmit} disabled={submitting || selected.length === 0}
+        onClick={handleSubmit}
+        disabled={submitting || selected.length === 0 || overLimit}
         className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-xl disabled:opacity-50"
       >
-        {submitting ? 'Uploading…' : scheduleAt ? 'Schedule post' : 'Post now'}
+        {submitting ? 'Publishing…' : scheduleAt ? 'Schedule post' : 'Post now'}
       </button>
     </div>
   )
