@@ -7,6 +7,7 @@ import {
   MediaItem,
   TokenExpiredError,
 } from './types'
+import { validatePost } from './limits'
 
 // Docs:
 //   Tweets  https://docs.x.com/x-api/posts/creation-of-a-post
@@ -14,7 +15,6 @@ import {
 //   OAuth   https://docs.x.com/resources/fundamentals/authentication/oauth-2-0/user-access-token
 const API = 'https://api.x.com/2'
 const CHUNK_BYTES = 4 * 1024 * 1024 // X caps each APPEND at 5MB; stay under it
-const TEXT_LIMIT = 280
 
 function mediaCategory(contentType: string): string {
   if (contentType === 'image/gif') return 'tweet_gif'
@@ -146,20 +146,9 @@ export const xAdapter: PlatformAdapter = {
 
   async publish({ accessToken, caption, media }: PublishInput): Promise<PublishResult> {
     try {
-      if (!caption.trim() && media.length === 0) {
-        return { success: false, errorMessage: 'A post needs text or media' }
-      }
-      if (caption.length > TEXT_LIMIT) {
-        return { success: false, errorMessage: `Text is ${caption.length} characters; X allows ${TEXT_LIMIT}` }
-      }
-      // X allows up to 4 images, or exactly 1 video/GIF.
-      const hasVideo = media.some((m) => m.contentType.startsWith('video/'))
-      if (hasVideo && media.length > 1) {
-        return { success: false, errorMessage: 'X accepts only one video per post' }
-      }
-      if (media.length > 4) {
-        return { success: false, errorMessage: 'X accepts at most 4 images per post' }
-      }
+      // Shared with the mock adapters so both enforce identical rules.
+      const invalid = validatePost('x', caption, media)
+      if (invalid) return { success: false, errorMessage: invalid }
 
       const mediaIds: string[] = []
       for (const item of media) {

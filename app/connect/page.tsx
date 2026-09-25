@@ -1,6 +1,7 @@
 import { supabaseServer } from '@/lib/supabase/server'
 import { PLATFORMS, PLAN_LIMITS, Platform } from '@/lib/platforms'
 import { redirect } from 'next/navigation'
+import { platformAvailable } from '@/lib/adapters'
 
 const ERRORS: Record<string, string> = {
   state_mismatch: 'That connection attempt expired or could not be verified. Please try again.',
@@ -52,12 +53,14 @@ export default async function ConnectPage({
         {(Object.keys(PLATFORMS) as Platform[]).map((key) => {
           const config = PLATFORMS[key]
           const isConnected = connectedPlatforms.has(key)
+          // In demo mode every platform works, so none should say "coming soon".
+          const available = platformAvailable(key)
 
           return (
             <div key={key} className="flex items-center justify-between border rounded-xl px-5 py-4">
               <div>
                 <span className="font-medium">{config.label}</span>
-                {!config.publishImplemented && (
+                {!available && (
                   <span className="ml-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
                     Coming soon
                   </span>
@@ -66,7 +69,7 @@ export default async function ConnectPage({
 
               {isConnected ? (
                 <span className="text-sm font-medium text-green-600">Connected ✓</span>
-              ) : !config.publishImplemented ? (
+              ) : !available ? (
                 <span className="text-sm text-black/30">Not available yet</span>
               ) : atLimit ? (
                 <a href="/pricing" className="text-sm font-semibold text-indigo-600 underline">

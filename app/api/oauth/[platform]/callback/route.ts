@@ -1,13 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PLATFORMS, Platform, PLAN_LIMITS } from '@/lib/platforms'
+import { PLATFORMS, Platform, PLAN_LIMITS, PlatformConfig } from '@/lib/platforms'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { adapters } from '@/lib/adapters'
+import { mockModeEnabled, mockAccessToken } from '@/lib/adapters/mock'
 import { openState, OAUTH_COOKIE } from '@/lib/oauth'
+
+type TokenResponse = {
+  access_token?: string
+  refresh_token?: string
+  expires_in?: number
+}
 
 function fail(request: NextRequest, reason: string) {
   const response = NextResponse.redirect(new URL(`/connect?error=${reason}`, request.url))
   response.cookies.delete(OAUTH_COOKIE)
   return response
+}
+
+/** Swap the authorization code for a token, per the platform's conventions. */
+async function exchangeCode(
+  config: PlatformConfig,
+  platform: string,
+  origin: string,
+  code: string,
+  verifier: string
+): Promise<TokenResponse> {
+  const clientId = process.env[config.clientIdEnv] ?? ''
+  const clientSecret = process.env[config.clientSecretEnv] ?? ''
+
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: `${origin}/api/oauth/${platform}/callback`,
+    client_id: clientId,
+  })
+  const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' }
+
+  if (config.tokenAuth === 'basic') {
+    // X requires the app credentials as HTTP Basic, not form fields.
+    headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`
+  } else {
+    body.set('client_secret', clientSecret)
+  }
+
+  if (config.usesPkce) body.set('code_verifier', verifier)
+
+  const res = await fetch(config.tokenUrl, { method: 'POST', headers, body })
+  if (!res.ok) return {}
+  return res.json().catch(() => ({}))
 }
 
 export async function GET(
@@ -49,33 +89,16 @@ export async function GET(
     return response
   }
 
-  // ---- Exchange the authorization code for an access token ----
-  const redirectUri = `${request.nextUrl.origin}/api/oauth/${platform}/callback`
-  const clientId = process.env[config.clientIdEnv] ?? ''
-  const clientSecret = process.env[config.clientSecretEnv] ?? ''
+  // ---- Obtain an access token ----
+  // Mock mode mints one locally; everything after this point is identical.
+  const tokenData: TokenResponse = mockModeEnabled()
+    ? {
+        access_token: mockAccessToken(userId, platform),
+        refresh_token: `mock-rt-${userId}`,
+        expires_in: 7200,
+      }
+    : await exchangeCode(config, platform, request.nextUrl.origin, code, state.verifier)
 
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    code,
-    redirect_uri: redirectUri,
-  })
-  const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' }
-
-  if (config.tokenAuth === 'basic') {
-    // X requires the app credentials as HTTP Basic, not form fields.
-    headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`
-    body.set('client_id', clientId)
-  } else {
-    body.set('client_id', clientId)
-    body.set('client_secret', clientSecret)
-  }
-
-  if (config.usesPkce) body.set('code_verifier', state.verifier)
-
-  const tokenRes = await fetch(config.tokenUrl, { method: 'POST', headers, body })
-  if (!tokenRes.ok) return fail(request, 'token_exchange_failed')
-
-  const tokenData = await tokenRes.json().catch(() => ({}))
   if (!tokenData.access_token) return fail(request, 'token_exchange_failed')
 
   // ---- Read back who this token belongs to ----

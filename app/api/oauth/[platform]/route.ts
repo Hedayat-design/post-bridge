@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { PLATFORMS, Platform } from '@/lib/platforms'
 import { supabaseServer } from '@/lib/supabase/server'
 import { createPkcePair, sealState, OAUTH_COOKIE, stateCookieOptions } from '@/lib/oauth'
+import { mockModeEnabled } from '@/lib/adapters/mock'
 
 export async function GET(
   request: NextRequest,
@@ -22,14 +23,29 @@ export async function GET(
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
+  const nonce = crypto.randomBytes(16).toString('hex')
+  const { verifier, challenge } = createPkcePair()
+  const sealed = sealState({ nonce, verifier, userId: user.id, platform, issuedAt: Date.now() })
+
+  // Mock mode skips the provider entirely and bounces straight to our own
+  // callback. The state cookie is still set and still verified, so the flow
+  // being exercised is the real one minus the third party.
+  if (mockModeEnabled()) {
+    const callback = new URL(`/api/oauth/${platform}/callback`, request.url)
+    callback.searchParams.set('code', `mock-code-${nonce}`)
+    callback.searchParams.set('state', nonce)
+
+    const response = NextResponse.redirect(callback)
+    response.cookies.set(OAUTH_COOKIE, sealed, stateCookieOptions())
+    return response
+  }
+
   const clientId = process.env[config.clientIdEnv]
   if (!clientId) {
     return NextResponse.redirect(new URL(`/connect?error=${platform}_not_configured`, request.url))
   }
 
   const redirectUri = `${request.nextUrl.origin}/api/oauth/${platform}/callback`
-  const nonce = crypto.randomBytes(16).toString('hex')
-  const { verifier, challenge } = createPkcePair()
 
   const authUrl = new URL(config.authUrl)
   authUrl.searchParams.set('client_id', clientId)
@@ -46,10 +62,6 @@ export async function GET(
   }
 
   const response = NextResponse.redirect(authUrl.toString())
-  response.cookies.set(
-    OAUTH_COOKIE,
-    sealState({ nonce, verifier, userId: user.id, platform, issuedAt: Date.now() }),
-    stateCookieOptions()
-  )
+  response.cookies.set(OAUTH_COOKIE, sealed, stateCookieOptions())
   return response
 }

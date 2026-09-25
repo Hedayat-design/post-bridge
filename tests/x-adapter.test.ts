@@ -143,12 +143,25 @@ describe('X adapter — validation', () => {
     assert.equal(mock.requests.length, 0)
   })
 
-  test('rejects a video alongside other media', async () => {
+  test('rejects a video alongside images', async () => {
     const result = await xAdapter.publish({
       ...base,
       mediaType: 'video',
       caption: 'mixed',
       media: [videoItem(), imageItem()],
+    })
+
+    assert.equal(result.success, false)
+    assert.match(result.errorMessage!, /cannot mix video and images/)
+    assert.equal(mock.requests.length, 0)
+  })
+
+  test('rejects two videos', async () => {
+    const result = await xAdapter.publish({
+      ...base,
+      mediaType: 'video',
+      caption: 'two clips',
+      media: [videoItem(), videoItem()],
     })
 
     assert.equal(result.success, false)

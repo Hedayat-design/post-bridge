@@ -18,6 +18,37 @@ compose/upload flow, dashboard, pricing/billing.
 Unimplemented platforms are hidden behind a "Coming soon" badge on `/connect`
 and return an explicit error if reached — they never report a false success.
 
+## Demo mode (no developer apps needed)
+
+Registering apps with X and LinkedIn takes days — LinkedIn's posting product
+goes through a review queue. To work on everything else meanwhile, set:
+
+```
+NEXT_PUBLIC_PLATFORM_MOCK=1
+```
+
+Every platform is then simulated, including the four whose real adapters
+aren't built. Connecting an account skips the provider and returns a fake
+profile; publishing validates the post against the **same shared limits** the
+live adapters use (`lib/adapters/limits.ts`) and returns a synthetic id. So a
+post that succeeds in demo mode will not be rejected by the real API for
+length or media-count reasons.
+
+An amber banner sits on every page, and mock mode throws on boot in
+production unless you also set `ALLOW_MOCK_IN_PRODUCTION=1` — a deploy that
+silently stopped posting would be worse than one that crashes.
+
+Caption directives let you exercise failure paths by hand:
+
+| Put this in a caption | What happens |
+|---|---|
+| `[fail]` | The platform rejects the post |
+| `[expired]` | The token is rejected, as if revoked |
+| `[slow]` | Takes ~3s, so you can watch the pending state |
+
+You still need a Supabase project — it holds auth, posts and media. That's
+one free signup rather than three developer applications.
+
 ## 1. Setup
 
 ```bash

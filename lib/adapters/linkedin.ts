@@ -7,6 +7,7 @@ import {
   MediaItem,
   TokenExpiredError,
 } from './types'
+import { validatePost } from './limits'
 
 // Docs:
 //   Posts   https://learn.microsoft.com/linkedin/marketing/community-management/shares/posts-api
@@ -14,7 +15,6 @@ import {
 //   Videos  https://learn.microsoft.com/linkedin/marketing/community-management/shares/videos-api
 //   OIDC    https://learn.microsoft.com/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2
 const REST = 'https://api.linkedin.com/rest'
-const TEXT_LIMIT = 3000
 
 // LinkedIn's versioned APIs require this header on every /rest call.
 export const LINKEDIN_VERSION = process.env.LINKEDIN_API_VERSION ?? '202506'
@@ -172,15 +172,9 @@ export const linkedinAdapter: PlatformAdapter = {
 
   async publish({ accessToken, caption, media, platformAccountId }: PublishInput): Promise<PublishResult> {
     try {
-      if (!caption.trim() && media.length === 0) {
-        return { success: false, errorMessage: 'A post needs text or media' }
-      }
-      if (caption.length > TEXT_LIMIT) {
-        return {
-          success: false,
-          errorMessage: `Text is ${caption.length} characters; LinkedIn allows ${TEXT_LIMIT}`,
-        }
-      }
+      // Shared with the mock adapters so both enforce identical rules.
+      const invalid = validatePost('linkedin', caption, media)
+      if (invalid) return { success: false, errorMessage: invalid }
 
       // This is the field the previous implementation omitted entirely, which
       // made every LinkedIn post fail with a 400.
@@ -188,12 +182,6 @@ export const linkedinAdapter: PlatformAdapter = {
 
       const videos = media.filter((m) => m.contentType.startsWith('video/'))
       const images = media.filter((m) => m.contentType.startsWith('image/'))
-      if (videos.length > 1) {
-        return { success: false, errorMessage: 'LinkedIn accepts only one video per post' }
-      }
-      if (videos.length && images.length) {
-        return { success: false, errorMessage: 'LinkedIn cannot mix video and images in one post' }
-      }
 
       let content: Record<string, unknown> | undefined
       if (videos.length === 1) {

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --test tests/**/*.test.ts"
+    "test": "tsx --test tests/**/*.test.ts",
+    "setup:demo": "node scripts/setup-demo.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.4.0",
