@@ -36,6 +36,19 @@ export type PublishResult = {
   success: boolean
   platformPostId?: string
   errorMessage?: string
+  /**
+   * Ids of the replies published under the main post, in the order they went
+   * out (X: the first comment, then each thread entry).
+   */
+  replyPostIds?: string[]
+  /**
+   * The main post is live but something under it is not — an X first comment
+   * or thread entry that failed. `success` stays true and `platformPostId` is
+   * the real id, because the tweet cannot be unsent and reporting a flat
+   * failure would invite a retry that double-posts. The reply failure is
+   * carried here so it reaches the user instead of being dropped.
+   */
+  partialErrorMessage?: string
 }
 
 /** Identity of the connected account, read back from the platform after OAuth. */

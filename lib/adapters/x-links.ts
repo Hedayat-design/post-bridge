@@ -46,19 +46,45 @@ const BARE_DOMAIN = new RegExp(
 )
 
 /**
+ * Runs the three patterns in the one order that matters: a scheme URL is
+ * consumed before WWW_URL or BARE_DOMAIN can match the tail inside it.
+ *
+ * Both stripLinks and extractLinks go through here, so what is removed from a
+ * caption and what is offered to put in the first comment are the same set by
+ * construction, not by two regex lists kept in step by hand.
+ */
+function removeLinks(caption: string, onMatch?: (link: string) => void): string {
+  const take = (match: string) => {
+    onMatch?.(match)
+    return ''
+  }
+
+  return caption.replace(SCHEME_URL, take).replace(WWW_URL, take).replace(BARE_DOMAIN, take)
+}
+
+/**
+ * The links a caption carries, in the order they appear and without repeats.
+ *
+ * This is what the composer offers to move into the X first comment: the post
+ * body gives the URL up to avoid X's surcharge, and the reply is where it
+ * lands. Exact duplicates are dropped — the same URL twice in one reply is
+ * noise — but two different links both survive.
+ */
+export function extractLinks(caption: string): string[] {
+  const found: string[] = []
+  removeLinks(caption, (link) => found.push(link))
+  return Array.from(new Set(found))
+}
+
+/**
  * Removes links from a caption and tidies the whitespace they leave behind.
  * Returns the cleaned caption; a caption that was nothing but a link comes
  * back empty, and the caller's own validation then rejects it rather than
  * posting a blank tweet.
  */
 export function stripLinks(caption: string): string {
-  const withoutLinks = caption
-    .replace(SCHEME_URL, '')
-    .replace(WWW_URL, '')
-    .replace(BARE_DOMAIN, '')
-
   return (
-    withoutLinks
+    removeLinks(caption)
       // collapse runs of spaces/tabs a removed link left mid-line
       .replace(/[ \t]{2,}/g, ' ')
       // drop spaces that now sit just before punctuation

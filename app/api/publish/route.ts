@@ -4,7 +4,12 @@ import { supabaseAdmin } from '@/lib/supabase/server'
 import { adapters } from '@/lib/adapters'
 import { ensureFreshToken, SocialAccountRow } from '@/lib/tokens'
 import { downloadMedia } from '@/lib/media'
-import { TokenExpiredError } from '@/lib/adapters/types'
+import { MediaItem, TokenExpiredError } from '@/lib/adapters/types'
+import {
+  mediaTypeFor,
+  resolveTargetContent,
+  validateResolvedTarget,
+} from '@/lib/adapters/overrides'
 
 export const maxDuration = 300 // uploads are slow; don't get cut off mid-post
 
@@ -43,11 +48,32 @@ export async function POST(request: NextRequest) {
     .eq('post_id', postId)
     .eq('status', 'pending') // don't re-send targets that already succeeded
 
-  // Download once and share the bytes across every platform, rather than
-  // handing each adapter a URL it cannot fetch.
-  let media
+  // Resolve each target's caption and media before anything else: a target can
+  // override its media, so the download set is the union of what the targets
+  // actually need rather than whatever the post carries as its default.
+  const pending = (targets ?? []).map((target) => {
+    const account = target.social_accounts as SocialAccountRow
+    return {
+      target,
+      account,
+      content: resolveTargetContent({
+        platform: account.platform,
+        accountId: account.id,
+        caption: post.caption ?? '',
+        mediaUrls: post.media_urls ?? [],
+        platformConfigurations: post.platform_configurations,
+        accountConfigurations: post.account_configurations,
+      }),
+    }
+  })
+
+  // Download each distinct URL once and share the bytes across every target
+  // that uses it, rather than handing an adapter a URL it cannot fetch or
+  // fetching the same file per platform.
+  let mediaByUrl: Map<string, MediaItem>
   try {
-    media = await downloadMedia(post.media_urls ?? [])
+    const urls = Array.from(new Set(pending.flatMap((p) => p.content.mediaUrls)))
+    mediaByUrl = new Map((await downloadMedia(urls)).map((item) => [item.url, item]))
   } catch (e) {
     await admin
       .from('post_targets')
@@ -58,8 +84,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
 
-  for (const target of targets ?? []) {
-    const account = target.social_accounts as SocialAccountRow
+  for (const { target, account, content } of pending) {
     const adapter = adapters[account.platform]
 
     if (!adapter) {
@@ -70,17 +95,42 @@ export async function POST(request: NextRequest) {
       continue
     }
 
+    // Every resolved URL is in the map: the download above either produced all
+    // of them or failed the whole post.
+    const media = content.mediaUrls.map((url) => mediaByUrl.get(url)!)
+    const capabilities = { hasXPremium: account.has_x_premium ?? false }
+    const platformOptions = post.platform_options ?? {}
+
+    // Check the caption this target actually publishes, which is not the post's
+    // default once something overrides it. The adapters validate again — this
+    // is to fail before spending a token refresh and a media upload, and to
+    // give the stub platforms the same rejection the real ones would.
+    const invalid = validateResolvedTarget({
+      platform: account.platform,
+      caption: content.caption,
+      media,
+      capabilities,
+      options: platformOptions,
+    })
+    if (invalid) {
+      await admin
+        .from('post_targets')
+        .update({ status: 'failed', error_message: invalid })
+        .eq('id', target.id)
+      continue
+    }
+
     let result
     try {
       const accessToken = await ensureFreshToken(admin, account)
       result = await adapter.publish({
         accessToken,
-        caption: post.caption ?? '',
+        caption: content.caption,
         media,
-        mediaType: post.media_type ?? (media.length ? 'image' : 'text'),
+        mediaType: mediaTypeFor(media),
         platformAccountId: account.platform_account_id,
-        accountCapabilities: { hasXPremium: account.has_x_premium ?? false },
-        platformOptions: post.platform_options ?? {},
+        accountCapabilities: capabilities,
+        platformOptions,
       })
     } catch (e) {
       // A dead token is worth flagging distinctly — the fix is reconnecting,
@@ -94,12 +144,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 'partial' is the post that went out with something missing underneath
+    // it — an X first comment or thread entry that failed after the main
+    // tweet was already live. It is deliberately not 'failed': the id is
+    // real, the post is public, and a retry would double-post. It is not
+    // plain 'posted' either, or the reply error would vanish.
+    const partial = result.success && !!result.partialErrorMessage
+
     await admin
       .from('post_targets')
       .update({
-        status: result.success ? 'posted' : 'failed',
+        status: result.success ? (partial ? 'partial' : 'posted') : 'failed',
         platform_post_id: result.platformPostId ?? null,
-        error_message: result.errorMessage ?? null,
+        error_message: result.partialErrorMessage ?? result.errorMessage ?? null,
         posted_at: result.success ? new Date().toISOString() : null,
       })
       .eq('id', target.id)
@@ -112,12 +169,22 @@ export async function POST(request: NextRequest) {
     .select('status')
     .eq('post_id', postId)
 
-  const anyFailed = (finalTargets ?? []).some((t) => t.status !== 'posted')
+  // A partial target counts as delivered here: its post is live on the
+  // platform, so calling the whole post failed would be a lie the user can
+  // disprove by opening the tweet. The reply error stays on the target row.
+  const delivered = (finalTargets ?? []).filter(
+    (t) => t.status === 'posted' || t.status === 'partial'
+  )
+  const anyFailed = delivered.length < (finalTargets?.length ?? 0)
   await admin.from('posts').update({ status: anyFailed ? 'failed' : 'posted' }).eq('id', postId)
 
   return NextResponse.json({
     done: true,
-    posted: (finalTargets ?? []).filter((t) => t.status === 'posted').length,
+    // `posted` is what /api/posts checks before reporting a flat failure to
+    // the composer, so a partial has to count — otherwise a tweet that is
+    // live with a failed reply would come back as "Publishing failed".
+    posted: delivered.length,
+    partial: delivered.filter((t) => t.status === 'partial').length,
     total: finalTargets?.length ?? 0,
   })
 }

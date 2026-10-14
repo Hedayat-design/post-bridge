@@ -7,8 +7,8 @@ import {
   RefreshedToken,
   TokenExpiredError,
 } from './types'
-import { LIMITS, validatePost } from './limits'
-import { stripLinks } from './x-links'
+import { LIMITS, plannedXReplies } from './limits'
+import { validateResolvedTarget } from './overrides'
 
 /**
  * Fake platforms for local development and demos.
@@ -43,6 +43,9 @@ export function mockModeEnabled(): boolean {
  *   "[fail]"    — the platform rejects the post
  *   "[expired]" — the token is rejected, as if it had been revoked
  *   "[slow]"    — takes ~3s, to watch the pending state in the UI
+ *   "[replyfail]" — X only: the post publishes but its first reply does not,
+ *                   which is the partial state and the awkward one to reach
+ *                   for real (the tweet is live and cannot be unsent)
  */
 function directive(caption: string, name: string): boolean {
   return caption.toLowerCase().includes(`[${name}]`)
@@ -62,14 +65,18 @@ export function mockAdapter(platform: string): PlatformAdapter {
         throw new TokenExpiredError(`${label} rejected the access token (mock)`)
       }
 
-      // X strips links before measuring the caption, so the mock has to do it
-      // too — otherwise a caption that passes here would be measured
-      // differently in production, which is exactly what mock mode promises
-      // not to do.
-      const text = platform === 'x' ? stripLinks(caption) : caption
-
-      // Same rules as the live adapter, so a post that works here works there.
-      const invalid = validatePost(platform, text, media, accountCapabilities, platformOptions)
+      // The caption that arrives here is already resolved for this one target
+      // (account override → platform override → the post's own), and the same
+      // shared validation the publish route and the live adapters use runs
+      // against it — including X's strip-before-measure, which it owns. A
+      // demo must not measure something production wouldn't.
+      const invalid = validateResolvedTarget({
+        platform,
+        caption,
+        media,
+        capabilities: accountCapabilities,
+        options: platformOptions,
+      })
       if (invalid) return { success: false, errorMessage: invalid }
 
       if (directive(caption, 'fail')) {
@@ -80,9 +87,29 @@ export function mockAdapter(platform: string): PlatformAdapter {
       const delay = directive(caption, 'slow') ? 3000 : 150 + media.length * 200
       await new Promise((r) => setTimeout(r, delay))
 
+      const platformPostId = `mock-${platform}-${crypto.randomUUID()}`
+
+      // X replies come from the same planner the live adapter uses, so the
+      // chain a demo produces is the one production would produce — same
+      // order, same labels, same count.
+      const replies = platform === 'x' ? plannedXReplies(platformOptions?.x) : []
+      if (!replies.length) return { success: true, platformPostId }
+
+      // The main post is live either way; only the reply fails. Reporting
+      // success with an id plus a partial error is what the live adapter does.
+      if (directive(caption, 'replyfail')) {
+        return {
+          success: true,
+          platformPostId,
+          replyPostIds: [],
+          partialErrorMessage: `X ${replies[0].label} failed: ${label} rejected the reply (mock)`,
+        }
+      }
+
       return {
         success: true,
-        platformPostId: `mock-${platform}-${crypto.randomUUID()}`,
+        platformPostId,
+        replyPostIds: replies.map(() => `mock-${platform}-reply-${crypto.randomUUID()}`),
       }
     },
 

@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
+import { LIMITS, sanitizePlatformOptions, validateXReplies } from '@/lib/adapters/limits'
+import {
+  preflightResolvedTarget,
+  resolveTargetContent,
+  sanitizeConfigurations,
+  validateConfigurationTargets,
+} from '@/lib/adapters/overrides'
 
 export const maxDuration = 300
 
@@ -11,20 +18,49 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
   const body = await request.json()
-  const { caption, mediaUrls, mediaType, scheduledFor, socialAccountIds } = body as {
+  const {
+    caption,
+    mediaUrls,
+    mediaType,
+    scheduledFor,
+    socialAccountIds,
+    platformConfigurations,
+    accountConfigurations,
+    platformOptions,
+  } = body as {
     caption: string
     mediaUrls: string[]
     mediaType: 'image' | 'video' | 'carousel' | 'text'
     scheduledFor: string | null   // absolute ISO-8601 with offset, or null to post now
     socialAccountIds: string[]     // which connected accounts to publish to
+    // Caption/media overrides keyed by platform and by account id. See
+    // lib/adapters/overrides.ts for the resolution order.
+    platformConfigurations?: unknown
+    accountConfigurations?: unknown
+    // Settings passed through to the platform rather than resolved away:
+    // X first comment and thread, TikTok/YouTube disclosures. See
+    // PlatformOptions in lib/adapters/limits.ts.
+    platformOptions?: unknown
   }
 
   if (!socialAccountIds?.length) {
     return NextResponse.json({ error: 'Select at least one connected account' }, { status: 400 })
   }
-  if (!caption?.trim() && !mediaUrls?.length) {
-    return NextResponse.json({ error: 'Add a caption or some media' }, { status: 400 })
-  }
+
+  // Store only well-formed overrides: this lands in a jsonb column that the
+  // publish route reads back, and resolution is not the place to discover that
+  // a caption is a number.
+  const platformConfigs = sanitizeConfigurations(platformConfigurations)
+  const accountConfigs = sanitizeConfigurations(accountConfigurations)
+
+  // These reach the platform verbatim at publish time, so a wrong type here
+  // is a wrong type on someone's timeline. Drop anything malformed before it
+  // reaches the column.
+  const options = sanitizePlatformOptions(platformOptions)
+
+  // There is deliberately no "caption or media required" check here: with
+  // per-platform captions an empty default is legitimate, as long as every
+  // target resolves to something. That is checked per target below.
 
   // Reject a naive datetime outright rather than silently storing it as UTC
   // and firing the post hours away from when the user meant.
@@ -42,12 +78,70 @@ export async function POST(request: NextRequest) {
   // this on insert, but failing early gives a clearer error.
   const { data: ownedAccounts } = await supabase
     .from('social_accounts')
-    .select('id')
+    .select('id, platform, display_name, has_x_premium')
     .eq('user_id', user.id)
     .in('id', socialAccountIds)
 
   if ((ownedAccounts?.length ?? 0) !== socialAccountIds.length) {
     return NextResponse.json({ error: 'Unknown connected account' }, { status: 400 })
+  }
+
+  const accounts = ownedAccounts ?? []
+
+  const strayOverride = validateConfigurationTargets({
+    platformConfigurations: platformConfigs,
+    accountConfigurations: accountConfigs,
+    selectedPlatforms: accounts.map((a) => a.platform),
+    selectedAccountIds: accounts.map((a) => a.id),
+  })
+  if (strayOverride) {
+    return NextResponse.json({ error: strayOverride }, { status: 400 })
+  }
+
+  // Same reasoning as a stray caption override: a first comment written for an
+  // X account that is no longer selected would silently never be posted, and
+  // the user would be left wondering why their link never appeared.
+  if (options.x && !accounts.some((a) => a.platform === 'x')) {
+    return NextResponse.json(
+      { error: 'Wrote an X first comment or thread, but no X account is selected' },
+      { status: 400 }
+    )
+  }
+
+  // Check what each target will actually publish, not the post's default
+  // caption. A per-platform caption that is too long for its platform should
+  // fail here, while the user can still fix it — not at publish time, which for
+  // a scheduled post is hours later with nobody watching.
+  for (const account of accounts) {
+    const content = resolveTargetContent({
+      platform: account.platform,
+      accountId: account.id,
+      caption: caption ?? '',
+      mediaUrls: mediaUrls ?? [],
+      platformConfigurations: platformConfigs,
+      accountConfigurations: accountConfigs,
+    })
+
+    const capabilities = { hasXPremium: account.has_x_premium ?? false }
+
+    const invalid =
+      preflightResolvedTarget({
+        platform: account.platform,
+        caption: content.caption,
+        mediaCount: content.mediaUrls.length,
+        capabilities,
+      }) ??
+      // Every reply is a tweet, measured against this account's own ceiling.
+      // Catching an over-long one here means the user fixes it in the
+      // composer; catching it at publish time means the main tweet is already
+      // live and unsendable with its reply missing.
+      (account.platform === 'x' && options.x ? validateXReplies(options.x, capabilities) : null)
+
+    if (invalid) {
+      const label = LIMITS[account.platform]?.label ?? account.platform
+      const named = account.display_name ? `${label} · ${account.display_name}` : label
+      return NextResponse.json({ error: `${named}: ${invalid}` }, { status: 400 })
+    }
   }
 
   // Enforce free-plan post cap (5 total posts)
@@ -71,6 +165,9 @@ export async function POST(request: NextRequest) {
       media_type: mediaType,
       status: scheduledFor ? 'scheduled' : 'posting',
       scheduled_for: scheduledFor,
+      platform_configurations: platformConfigs,
+      account_configurations: accountConfigs,
+      platform_options: options,
     })
     .select()
     .single()

@@ -42,6 +42,14 @@ create table if not exists posts (
   -- Per-platform settings and the disclosures TikTok/YouTube require for
   -- AI-generated and sponsored content. See PlatformOptions in lib/adapters/limits.ts.
   platform_options jsonb not null default '{}'::jsonb,
+  -- Caption/media overrides, resolved per target as account → platform → post.
+  -- Kept out of platform_options because those are passed through to the
+  -- platform API while these are resolved away before the adapter is called.
+  -- See lib/adapters/overrides.ts and migration 0005.
+  --   platform_configurations: { "<platform>":   { caption?, media? } }
+  --   account_configurations:  { "<account_id>": { caption?, media? } }
+  platform_configurations jsonb not null default '{}'::jsonb,
+  account_configurations jsonb not null default '{}'::jsonb,
   scheduled_for timestamptz,                -- null = post immediately
   created_at timestamptz default now(),
   expires_at timestamptz default (now() + interval '3 months') -- free 3-month storage
@@ -54,7 +62,10 @@ create table if not exists post_targets (
   post_id uuid references posts(id) on delete cascade not null,
   social_account_id uuid references social_accounts(id) on delete cascade not null,
   platform_post_id text,                    -- id returned by the platform once posted
-  status text not null default 'pending' check (status in ('pending','posted','failed')),
+  -- 'partial' = the post itself is live but a reply under it failed (X first
+  -- comment / thread entry). There is no undo for a published tweet, so the
+  -- id stays valid and error_message carries the reply failure.
+  status text not null default 'pending' check (status in ('pending','posted','partial','failed')),
   error_message text,
   posted_at timestamptz
 );

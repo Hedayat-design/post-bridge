@@ -3,6 +3,19 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
 
+// A post target that published but lost a reply underneath it still went out,
+// so it counts as delivered; see the 'partial' status in supabase/schema.sql.
+function delivered(post: any) {
+  return (post.post_targets ?? []).filter(
+    (t: any) => t.status === 'posted' || t.status === 'partial'
+  )
+}
+
+function partialNote(post: any): string | null {
+  const partial = (post.post_targets ?? []).find((t: any) => t.status === 'partial')
+  return partial?.error_message ?? null
+}
+
 export default async function DashboardPage() {
   const supabase = supabaseServer()
   const { data: { session } } = await supabase.auth.getSession()
@@ -23,7 +36,7 @@ export default async function DashboardPage() {
 
   const { data: live } = await supabase
     .from('posts')
-    .select('id, caption, created_at, media_type, post_targets(status)')
+    .select('id, caption, created_at, media_type, post_targets(status, error_message)')
     .eq('user_id', session.user.id)
     .eq('status', 'posted')
     .order('created_at', { ascending: false })
@@ -74,8 +87,16 @@ export default async function DashboardPage() {
                 </span>
                 <span className="text-sm truncate flex-1">{p.caption || `(${p.media_type} post)`}</span>
                 <span className="text-xs text-black/40">
-                  {p.post_targets?.filter((t: any) => t.status === 'posted').length ?? 0}/{p.post_targets?.length ?? 0} ✓
+                  {delivered(p).length}/{p.post_targets?.length ?? 0} ✓
                 </span>
+                {/* A partial target is live, so it counts above — but the
+                    reply that failed under it has to be visible somewhere, or
+                    the row reads as a clean success. */}
+                {partialNote(p) && (
+                  <span className="text-xs text-amber-600" title={partialNote(p)!}>
+                    ⚠ reply failed
+                  </span>
+                )}
               </div>
             ))}
           </div>

@@ -7,7 +7,7 @@ import {
   MediaItem,
   TokenExpiredError,
 } from './types'
-import { validatePost } from './limits'
+import { PlannedReply, plannedXReplies, validatePost } from './limits'
 import { stripLinks } from './x-links'
 
 // Docs:
@@ -105,6 +105,85 @@ async function uploadMedia(accessToken: string, item: MediaItem): Promise<string
   return mediaId
 }
 
+type TweetOutcome = { id?: string; errorMessage?: string }
+
+/**
+ * One POST to /2/tweets. `reply.in_reply_to_tweet_id` is what makes a tweet a
+ * reply, and chaining it to the previous reply is what makes a thread.
+ */
+async function createTweet(
+  accessToken: string,
+  body: Record<string, unknown>
+): Promise<TweetOutcome> {
+  const res = await xFetch(`${API}/tweets`, accessToken, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok || !data?.data?.id) {
+    return {
+      errorMessage: data?.detail ?? data?.errors?.[0]?.message ?? 'X post failed',
+    }
+  }
+  return { id: data.data.id }
+}
+
+/**
+ * Publishes the first comment and thread entries as one chain under a tweet
+ * that is already live.
+ *
+ * Ordering: main tweet → first comment → thread[0] → thread[1] … A single
+ * chain, rather than branching the thread off the main tweet separately, is
+ * the only arrangement that keeps "each entry replies to the one before it"
+ * true; and the first comment goes directly under the main tweet because
+ * that is both its name and the whole reason it exists — the stripped link
+ * has to land where a reader sees it.
+ *
+ * Nothing in here throws. By the time it runs the main tweet is published and
+ * cannot be unsent, so a failed reply is reported as a partial result; letting
+ * it escape would mark the target failed and invite a retry that double-posts.
+ * That includes a 401: a token that dies between the tweet and its reply is
+ * still a live tweet.
+ */
+async function publishReplyChain(
+  accessToken: string,
+  rootTweetId: string,
+  replies: PlannedReply[]
+): Promise<{ replyPostIds: string[]; partialErrorMessage?: string }> {
+  const replyPostIds: string[] = []
+  let parentId = rootTweetId
+
+  for (const reply of replies) {
+    let outcome: TweetOutcome
+    try {
+      // Links are deliberately NOT stripped here. The main tweet gives them
+      // up to avoid X's surcharge; the reply is where they are meant to go.
+      outcome = await createTweet(accessToken, {
+        text: reply.text,
+        reply: { in_reply_to_tweet_id: parentId },
+      })
+    } catch (e) {
+      outcome = { errorMessage: (e as Error).message }
+    }
+
+    if (!outcome.id) {
+      // Stop rather than skip ahead: a reply pointed at a tweet that was
+      // never created would detach from the thread and read as a stray post.
+      return {
+        replyPostIds,
+        partialErrorMessage: `X ${reply.label} failed: ${outcome.errorMessage}`,
+      }
+    }
+
+    replyPostIds.push(outcome.id)
+    parentId = outcome.id
+  }
+
+  return { replyPostIds }
+}
+
 export const xAdapter: PlatformAdapter = {
   async fetchProfile(accessToken: string): Promise<PlatformProfile> {
     const BASE_FIELDS = 'profile_image_url,username,name'
@@ -170,6 +249,7 @@ export const xAdapter: PlatformAdapter = {
     caption,
     media,
     accountCapabilities,
+    platformOptions,
   }: PublishInput): Promise<PublishResult> {
     try {
       // X demotes and charges more for posts carrying an outbound link, so the
@@ -178,33 +258,37 @@ export const xAdapter: PlatformAdapter = {
       // exceeded 280 because of a long URL still publishes.
       const text = stripLinks(caption)
 
-      // Shared with the mock adapters so both enforce identical rules.
-      const invalid = validatePost('x', text, media, accountCapabilities)
+      // Shared with the mock adapters so both enforce identical rules. This
+      // also measures every reply, so an over-long thread entry is caught
+      // before the main tweet goes out rather than halfway down the chain.
+      const invalid = validatePost('x', text, media, accountCapabilities, platformOptions)
       if (invalid) return { success: false, errorMessage: invalid }
+
+      const replies = plannedXReplies(platformOptions?.x)
 
       const mediaIds: string[] = []
       for (const item of media) {
         mediaIds.push(await uploadMedia(accessToken, item))
       }
 
-      const res = await xFetch(`${API}/tweets`, accessToken, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text,
-          ...(mediaIds.length ? { media: { media_ids: mediaIds } } : {}),
-        }),
+      const main = await createTweet(accessToken, {
+        text,
+        ...(mediaIds.length ? { media: { media_ids: mediaIds } } : {}),
       })
+      if (!main.id) return { success: false, errorMessage: main.errorMessage }
 
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok || !data?.data?.id) {
-        return {
-          success: false,
-          errorMessage: data?.detail ?? data?.errors?.[0]?.message ?? 'X post failed',
-        }
+      if (!replies.length) return { success: true, platformPostId: main.id }
+
+      // Past this point the tweet is live, so publishReplyChain never throws:
+      // a reply failure is a partial result, not a failed post.
+      const chain = await publishReplyChain(accessToken, main.id, replies)
+
+      return {
+        success: true,
+        platformPostId: main.id,
+        replyPostIds: chain.replyPostIds,
+        partialErrorMessage: chain.partialErrorMessage,
       }
-
-      return { success: true, platformPostId: data.data.id }
     } catch (e) {
       if (e instanceof TokenExpiredError) throw e
       return { success: false, errorMessage: (e as Error).message }
