@@ -36,3 +36,6 @@ next-env.d.ts
 
 # supabase cli scratch
 supabase/.temp/
+
+# local demo account (never commit)
+.demo-credentials.local
