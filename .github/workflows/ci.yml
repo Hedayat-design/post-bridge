@@ -21,6 +21,19 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      # `npm test` matches tests/*.test.ts, which the shell expands. Guard
+      # against a nested test file that the pattern would silently skip: a
+      # missing file makes the suite smaller, not red, so nothing else would
+      # catch it.
+      - name: Check no test file is outside the pattern
+        run: |
+          nested=$(find tests -mindepth 2 -name '*.test.ts')
+          if [ -n "$nested" ]; then
+            echo "These test files are not matched by tests/*.test.ts:"
+            echo "$nested"
+            exit 1
+          fi
+
       - name: Test
         run: npm test
 
