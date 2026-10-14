@@ -2,11 +2,15 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabase/client'
+import { effectiveTextLimit } from '@/lib/adapters/limits'
+import { containsLink } from '@/lib/adapters/x-links'
 
-type SocialAccount = { id: string; platform: string; display_name: string | null }
-
-// Keep the user inside the stricter platform's ceiling as they type.
-const TEXT_LIMITS: Record<string, number> = { x: 280, linkedin: 3000 }
+type SocialAccount = {
+  id: string
+  platform: string
+  display_name: string | null
+  has_x_premium: boolean | null
+}
 
 export default function ComposePage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
@@ -20,20 +24,36 @@ export default function ComposePage() {
   const supabase = supabaseBrowser()
 
   useEffect(() => {
-    supabase.from('social_accounts').select('id, platform, display_name').then(({ data }) => {
-      if (data) setAccounts(data)
-    })
+    supabase
+      .from('social_accounts')
+      .select('id, platform, display_name, has_x_premium')
+      .then(({ data }) => {
+        if (data) setAccounts(data)
+      })
   }, [])
 
   function toggle(id: string) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
-  const selectedPlatforms = accounts.filter((a) => selected.includes(a.id)).map((a) => a.platform)
-  const limit = selectedPlatforms.length
-    ? Math.min(...selectedPlatforms.map((p) => TEXT_LIMITS[p] ?? Infinity))
+  const selectedAccounts = accounts.filter((a) => selected.includes(a.id))
+  const selectedPlatforms = selectedAccounts.map((a) => a.platform)
+
+  // The ceiling comes from the accounts themselves, not the platform list: a
+  // Premium X account allows 25,000 characters where a standard one allows 280,
+  // and the same shared module decides it here and at publish time.
+  const limit = selectedAccounts.length
+    ? Math.min(
+        ...selectedAccounts.map((a) =>
+          effectiveTextLimit(a.platform, { hasXPremium: a.has_x_premium ?? false })
+        )
+      )
     : Infinity
   const overLimit = caption.length > limit
+
+  // X strips links from the post body before publishing, so say so rather than
+  // letting the link quietly vanish from what the user wrote.
+  const xLinkNotice = selectedPlatforms.includes('x') && containsLink(caption)
 
   async function handleSubmit() {
     setSubmitting(true)
@@ -99,10 +119,18 @@ export default function ComposePage() {
         onChange={(e) => setCaption(e.target.value)}
         className="w-full border rounded-xl px-4 py-3 mb-1 h-28"
       />
-      <p className={`text-xs mb-6 ${overLimit ? 'text-red-600' : 'text-black/40'}`}>
+      <p className={`text-xs mb-1 ${overLimit ? 'text-red-600' : 'text-black/40'}`}>
         {caption.length}{limit !== Infinity ? ` / ${limit}` : ''} characters
         {overLimit ? ' — too long for a selected platform' : ''}
       </p>
+      {xLinkNotice ? (
+        <p className="text-xs text-amber-700 mb-6">
+          Links are removed from the X post — X demotes posts that carry one.
+          Other platforms keep it.
+        </p>
+      ) : (
+        <div className="mb-6" />
+      )}
 
       <p className="text-sm font-medium mb-2">Post to</p>
       <div className="flex flex-wrap gap-2 mb-6">

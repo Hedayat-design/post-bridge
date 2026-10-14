@@ -8,6 +8,7 @@ import {
   TokenExpiredError,
 } from './types'
 import { validatePost } from './limits'
+import { stripLinks } from './x-links'
 
 // Docs:
 //   Tweets  https://docs.x.com/x-api/posts/creation-of-a-post
@@ -106,15 +107,35 @@ async function uploadMedia(accessToken: string, item: MediaItem): Promise<string
 
 export const xAdapter: PlatformAdapter = {
   async fetchProfile(accessToken: string): Promise<PlatformProfile> {
-    const res = await xFetch(`${API}/users/me?user.fields=profile_image_url,username,name`, accessToken)
-    const data = await res.json().catch(() => ({}))
+    const BASE_FIELDS = 'profile_image_url,username,name'
+
+    // subscription_type tells us whether the caption limit is 280 or 25,000.
+    // It is requested separately from the fields we depend on: X returns 400
+    // for an unrecognised user.field, and a rejected field must not be able
+    // to break account connection. On any doubt we fall back to the base
+    // request and treat the account as non-Premium, which is the stricter
+    // limit — X itself rejects an over-long post, so we fail safe either way.
+    let res = await xFetch(
+      `${API}/users/me?user.fields=${BASE_FIELDS},subscription_type`,
+      accessToken
+    )
+    let data = await res.json().catch(() => ({}))
+
+    if (!res.ok || !data?.data?.id) {
+      res = await xFetch(`${API}/users/me?user.fields=${BASE_FIELDS}`, accessToken)
+      data = await res.json().catch(() => ({}))
+    }
     if (!res.ok || !data?.data?.id) {
       throw new Error(data?.detail ?? data?.title ?? 'Could not read X profile')
     }
+
+    const subscription = String(data.data.subscription_type ?? '').toLowerCase()
+
     return {
       platformAccountId: data.data.id,
       displayName: data.data.username ? `@${data.data.username}` : data.data.name,
       avatarUrl: data.data.profile_image_url,
+      hasXPremium: subscription === 'premium' || subscription === 'premiumplus',
     }
   },
 
@@ -144,10 +165,21 @@ export const xAdapter: PlatformAdapter = {
     }
   },
 
-  async publish({ accessToken, caption, media }: PublishInput): Promise<PublishResult> {
+  async publish({
+    accessToken,
+    caption,
+    media,
+    accountCapabilities,
+  }: PublishInput): Promise<PublishResult> {
     try {
+      // X demotes and charges more for posts carrying an outbound link, so the
+      // link comes out before the post is measured or sent. Validating the
+      // stripped text — not what the user typed — means a caption that only
+      // exceeded 280 because of a long URL still publishes.
+      const text = stripLinks(caption)
+
       // Shared with the mock adapters so both enforce identical rules.
-      const invalid = validatePost('x', caption, media)
+      const invalid = validatePost('x', text, media, accountCapabilities)
       if (invalid) return { success: false, errorMessage: invalid }
 
       const mediaIds: string[] = []
@@ -159,7 +191,7 @@ export const xAdapter: PlatformAdapter = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: caption,
+          text,
           ...(mediaIds.length ? { media: { media_ids: mediaIds } } : {}),
         }),
       })

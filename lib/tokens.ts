@@ -12,6 +12,7 @@ export type SocialAccountRow = {
   access_token: string
   refresh_token: string | null
   token_expires_at: string | null
+  has_x_premium?: boolean | null
 }
 
 /**

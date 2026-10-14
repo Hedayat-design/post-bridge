@@ -79,6 +79,8 @@ export async function POST(request: NextRequest) {
         media,
         mediaType: post.media_type ?? (media.length ? 'image' : 'text'),
         platformAccountId: account.platform_account_id,
+        accountCapabilities: { hasXPremium: account.has_x_premium ?? false },
+        platformOptions: post.platform_options ?? {},
       })
     } catch (e) {
       // A dead token is worth flagging distinctly — the fix is reconnecting,

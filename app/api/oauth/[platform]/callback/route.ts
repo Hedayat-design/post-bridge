@@ -123,6 +123,9 @@ export async function GET(
       token_expires_at: tokenData.expires_in
         ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
         : null,
+      // Re-read on every (re)connect, so an account that upgrades to Premium
+      // picks up the higher caption limit by reconnecting.
+      has_x_premium: profileInfo.hasXPremium ?? false,
     },
     // Reconnecting an account must update the existing row, not insert a
     // duplicate — this targets the table's unique constraint.

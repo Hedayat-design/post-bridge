@@ -26,6 +26,9 @@ Scalar, auth via `bearer` (API key) and `mcp-oauth`.
 
 ## Gaps, highest value first
 
+Items 2, 3 and 4 are **done** — see `lib/adapters/limits.ts`,
+`lib/adapters/x-links.ts` and `tests/platform-rules.test.ts`.
+
 ### 1. Per-platform and per-account overrides
 Their `CreatePostDto` carries `platform_configurations` (keyed by platform) and
 `account_configurations` (keyed by `account_id`). Each can override `caption`
@@ -35,7 +38,7 @@ nothing equivalent — we send one caption everywhere.
 Suggested: `platform_configurations jsonb` and `account_configurations jsonb` on
 `posts`, resolved at publish time as account override → platform override → post default.
 
-### 2. Platform compliance toggles (correctness, not polish)
+### 2. Platform compliance toggles — DONE (correctness, not polish)
 Their per-platform configs expose disclosures the platforms **require**:
 
 - TikTok: `is_aigc` (AI-generated label), `disclose_branded_content`,
@@ -48,16 +51,40 @@ Publishing to TikTok/YouTube without the AI-content and paid-promotion
 disclosures can put our users in breach of platform policy. Treat as required
 before those adapters ship, not as a later feature.
 
-### 3. X character limit is wrong for Premium
-Their `SocialAccountDto` has `has_x_premium`: Premium accounts allow **25,000**
-characters, not 280. Our `limits.ts` hardcodes `textLimit: 280`, so we would
-reject valid posts. Needs to be per-account, not per-platform.
+Implemented as `TiktokOptions` / `YoutubeOptions` in `lib/adapters/limits.ts`,
+carried on `PublishInput.platformOptions` and persisted in `posts.platform_options`.
+`validatePlatformOptions` enforces the combinations the platforms reject
+(branded content on a private TikTok post, Duet/Stitch on a photo post,
+YouTube's 500-character tag cap). The real TikTok and YouTube adapters are still
+stubs, but mock mode exercises these rules today, so the adapters cannot be
+built without them.
 
-### 4. Links stripped from X captions
+### 3. X character limit is wrong for Premium — DONE
+Their `SocialAccountDto` has `has_x_premium`: Premium accounts allow **25,000**
+characters, not 280. Our `limits.ts` hardcoded `textLimit: 280`, so we rejected
+valid posts.
+
+Now `effectiveTextLimit(platform, capabilities)` resolves the ceiling per
+account, backed by `social_accounts.has_x_premium` (migration 0003) and read
+from X's `subscription_type` on connect. The compose counter uses the same
+function, replacing a second hardcoded `{ x: 280 }` map that had drifted out of
+step with the adapters. Detection is best-effort and falls back to 280: X
+answers 400 for an unrecognised `user.field`, and that must not be able to break
+account connection.
+
+### 4. Links stripped from X captions — DONE
 Their create-post endpoint strips URLs (full and bare domains) from X captions
 before publishing, "because X charges far more for posts that contain a link",
 and advises putting the link in a reply instead. Pairs with their X
 `first_comment` and `thread[]` support. Real domain knowledge we lacked.
+
+`lib/adapters/x-links.ts` now does this for X only. Bare domains match an
+explicit TLD list rather than a generic "dot something" pattern: prose is full
+of things a loose regex reads as a domain ("Node.js", "e.g.", "P.S. Come in"),
+and silently eating words out of a caption is worse than leaving a link in. The
+caption is stripped *before* it is measured, so a post that only exceeded 280
+because of a long URL now publishes. Still to add: `first_comment`, so the
+stripped link has somewhere to go.
 
 ### 5. Media as a first-class resource
 They have `/v1/media` with `POST /v1/media/create-upload-url`

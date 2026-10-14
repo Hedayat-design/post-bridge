@@ -8,6 +8,7 @@ import {
   TokenExpiredError,
 } from './types'
 import { LIMITS, validatePost } from './limits'
+import { stripLinks } from './x-links'
 
 /**
  * Fake platforms for local development and demos.
@@ -51,13 +52,24 @@ export function mockAdapter(platform: string): PlatformAdapter {
   const label = LIMITS[platform]?.label ?? platform
 
   return {
-    async publish({ caption, media }: PublishInput): Promise<PublishResult> {
+    async publish({
+      caption,
+      media,
+      accountCapabilities,
+      platformOptions,
+    }: PublishInput): Promise<PublishResult> {
       if (directive(caption, 'expired')) {
         throw new TokenExpiredError(`${label} rejected the access token (mock)`)
       }
 
+      // X strips links before measuring the caption, so the mock has to do it
+      // too — otherwise a caption that passes here would be measured
+      // differently in production, which is exactly what mock mode promises
+      // not to do.
+      const text = platform === 'x' ? stripLinks(caption) : caption
+
       // Same rules as the live adapter, so a post that works here works there.
-      const invalid = validatePost(platform, caption, media)
+      const invalid = validatePost(platform, text, media, accountCapabilities, platformOptions)
       if (invalid) return { success: false, errorMessage: invalid }
 
       if (directive(caption, 'fail')) {

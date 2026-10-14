@@ -1,3 +1,5 @@
+import { AccountCapabilities, PlatformOptions } from './limits'
+
 // Every platform adapter implements this shape. The publisher calls these
 // without caring which platform it's talking to.
 
@@ -18,6 +20,16 @@ export type PublishInput = {
   mediaType: 'image' | 'video' | 'carousel' | 'text'
   /** The account's id on the platform — several APIs need it in the path/body. */
   platformAccountId: string
+  /**
+   * What this particular account can do, where it differs from the platform
+   * default. X Premium raising the caption limit is the current case.
+   */
+  accountCapabilities?: AccountCapabilities
+  /**
+   * Per-platform settings and the disclosures TikTok and YouTube require for
+   * AI-generated or sponsored content.
+   */
+  platformOptions?: PlatformOptions
 }
 
 export type PublishResult = {
@@ -31,6 +43,8 @@ export type PlatformProfile = {
   platformAccountId: string
   displayName?: string
   avatarUrl?: string
+  /** X only: read from the profile so the caption limit can follow the account. */
+  hasXPremium?: boolean
 }
 
 export type RefreshedToken = {

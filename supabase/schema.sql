@@ -24,6 +24,9 @@ create table if not exists social_accounts (
   access_token text not null,               -- encrypt at rest via Supabase Vault in production
   refresh_token text,
   token_expires_at timestamptz,
+  -- X Premium allows 25,000-character posts instead of 280. A property of the
+  -- account, so the caption limit cannot be a per-platform constant.
+  has_x_premium boolean not null default false,
   connected_at timestamptz default now(),
   unique(user_id, platform, platform_account_id)
 );
@@ -36,6 +39,9 @@ create table if not exists posts (
   media_urls text[] default '{}',           -- Supabase Storage URLs
   media_type text check (media_type in ('image','video','carousel')),
   status text not null default 'draft' check (status in ('draft','scheduled','posting','posted','failed')),
+  -- Per-platform settings and the disclosures TikTok/YouTube require for
+  -- AI-generated and sponsored content. See PlatformOptions in lib/adapters/limits.ts.
+  platform_options jsonb not null default '{}'::jsonb,
   scheduled_for timestamptz,                -- null = post immediately
   created_at timestamptz default now(),
   expires_at timestamptz default (now() + interval '3 months') -- free 3-month storage
