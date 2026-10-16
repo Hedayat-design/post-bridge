@@ -246,9 +246,9 @@ export default function ComposePage() {
 
   return (
     <div className="max-w-xl mx-auto px-6 py-16">
-      <h1 className="text-2xl font-bold mb-6">Upload to Post Bridge</h1>
+      <h1 className="text-2xl font-bold text-ink mb-6">Upload to Post Bridge</h1>
 
-      <label className="block border-2 border-dashed rounded-xl p-8 text-center text-sm text-black/50 cursor-pointer mb-6">
+      <label className="block border-2 border-dashed border-hairline-strong bg-surface/50 rounded-xl p-8 text-center text-sm text-muted cursor-pointer mb-6 transition-colors hover:border-primary hover:text-primary">
         {files.length === 0
           ? 'Click to choose images or a video'
           : files.map((f) => f.name).join(', ')}
@@ -258,16 +258,18 @@ export default function ComposePage() {
         />
       </label>
 
-      <p className="text-sm font-medium mb-2">Post to</p>
+      <p className="text-sm font-medium text-ink mb-2">Post to</p>
       <div className="flex flex-wrap gap-2 mb-6">
         {accounts.length === 0 && (
-          <p className="text-sm text-black/50">No connected accounts yet — <a href="/connect" className="underline">connect one</a>.</p>
+          <p className="text-sm text-muted">No connected accounts yet — <a href="/connect" className="text-primary underline underline-offset-2">connect one</a>.</p>
         )}
         {accounts.map((a) => (
           <button
             key={a.id} type="button" onClick={() => toggle(a.id)}
             className={`px-4 py-2 rounded-full text-sm font-medium border ${
-              selected.includes(a.id) ? 'bg-indigo-600 text-white border-indigo-600' : 'border-black/15'
+              selected.includes(a.id)
+                ? 'bg-primary text-primary-fg border-primary shadow-card'
+                : 'border-hairline-strong text-ink hover:border-primary hover:text-primary'
             }`}
           >
             {a.platform}{a.display_name ? ` · ${a.display_name}` : ''}
@@ -279,12 +281,12 @@ export default function ComposePage() {
           want different text, so the default is a starting point rather than
           the only option. */}
       {selectedPlatforms.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-2 border-b">
+        <div className="flex flex-wrap gap-1 mb-2 border-b border-hairline">
           {['default', ...selectedPlatforms].map((key) => (
             <button
               key={key} type="button" onClick={() => setTab(key)}
               className={`px-3 py-1.5 text-sm font-medium rounded-t-lg -mb-px border-b-2 ${
-                tab === key ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-black/50'
+                tab === key ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-ink'
               }`}
             >
               {key === 'default' ? 'All platforms' : tabLabel(key)}
@@ -298,7 +300,7 @@ export default function ComposePage() {
         <textarea
           placeholder="Write a caption…" value={caption}
           onChange={(e) => setCaption(e.target.value)}
-          className="w-full border rounded-xl px-4 py-3 mb-2 h-28"
+          className="w-full border border-hairline bg-surface rounded-xl px-4 py-3 mb-2 h-28 transition-colors focus:border-primary"
         />
       ) : (
         <div className="mb-2">
@@ -321,12 +323,12 @@ export default function ComposePage() {
                   onChange={(e) =>
                     setOverride(platformCaptions, setPlatformCaptions, tab, e.target.value)
                   }
-                  className={`w-full border rounded-xl px-4 py-3 h-28 ${
-                    current.overridden ? '' : 'bg-black/[0.03] text-black/50'
+                  className={`w-full border border-hairline rounded-xl px-4 py-3 h-28 transition-colors focus:border-primary ${
+                    current.overridden ? 'bg-surface' : 'bg-sunken text-muted'
                   }`}
                 />
                 <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-black/40">
+                  <span className="text-faint">
                     {current.overridden
                       ? `Only ${tabLabel(tab)} gets this text.`
                       : `Using the caption from All platforms — click to customise.`}
@@ -334,7 +336,7 @@ export default function ComposePage() {
                   {current.overridden && (
                     <button
                       type="button"
-                      className="underline text-black/50"
+                      className="underline underline-offset-2 text-primary"
                       onClick={() =>
                         setOverride(platformCaptions, setPlatformCaptions, tab, null)
                       }
@@ -356,8 +358,8 @@ export default function ComposePage() {
               .map((a) => {
                 const current = accountCaption(a.id, tab)
                 return (
-                  <div key={a.id} className="mt-3 border-l-2 pl-3">
-                    <p className="text-xs font-medium mb-1">
+                  <div key={a.id} className="mt-3 border-l-2 border-hairline pl-3">
+                    <p className="text-xs font-medium text-ink mb-1">
                       {a.display_name ?? a.id.slice(0, 8)}
                       {current.overridden ? '' : ' — inherits the caption above'}
                     </p>
@@ -368,11 +370,11 @@ export default function ComposePage() {
                           onChange={(e) =>
                             setOverride(accountCaptions, setAccountCaptions, a.id, e.target.value)
                           }
-                          className="w-full border rounded-xl px-3 py-2 h-20 text-sm"
+                          className="w-full border border-hairline bg-surface rounded-xl px-3 py-2 h-20 text-sm transition-colors focus:border-primary"
                         />
                         <button
                           type="button"
-                          className="text-xs underline text-black/50"
+                          className="text-xs underline underline-offset-2 text-primary"
                           onClick={() =>
                             setOverride(accountCaptions, setAccountCaptions, a.id, null)
                           }
@@ -383,7 +385,7 @@ export default function ComposePage() {
                     ) : (
                       <button
                         type="button"
-                        className="text-xs underline text-black/50"
+                        className="text-xs underline underline-offset-2 text-primary"
                         onClick={() =>
                           setOverride(accountCaptions, setAccountCaptions, a.id, current.text)
                         }
@@ -401,12 +403,12 @@ export default function ComposePage() {
           stopped being meaningful once every platform can carry its own text. */}
       <div className="mb-6 space-y-0.5">
         {targets.length === 0 && (
-          <p className="text-xs text-black/40">{caption.length} characters</p>
+          <p className="text-xs text-faint">{caption.length} characters</p>
         )}
         {targets.map((t) => (
           <p
             key={t.account.id}
-            className={`text-xs ${t.error ? 'text-red-600' : 'text-black/40'}`}
+            className={`text-xs ${t.error ? 'text-danger' : 'text-muted'}`}
           >
             {tabLabel(t.account.platform)}
             {t.account.display_name ? ` · ${t.account.display_name}` : ''}{' '}
@@ -417,7 +419,7 @@ export default function ComposePage() {
           </p>
         ))}
         {targets.some((t) => t.strippedALink) && (
-          <p className="text-xs text-amber-700 pt-1">
+          <p className="text-xs text-warning pt-1">
             Links are removed from the X post — X demotes posts that carry one.
             Other platforms keep it.
           </p>
@@ -428,8 +430,8 @@ export default function ComposePage() {
           without X demoting it, so the link goes in a reply instead — and
           replies keep their links. Thread entries chain on under it. */}
       {xAccounts.length > 0 && (
-        <div className="border rounded-2xl p-4 mb-6">
-          <p className="text-sm font-medium mb-1">X reply</p>
+        <div className="border border-accent/30 bg-accent-soft/40 rounded-2xl p-4 mb-6">
+          <p className="text-sm font-medium text-ink mb-1">X reply</p>
 
           {linksToOffer.length > 0 && (
             <button
@@ -441,7 +443,7 @@ export default function ComposePage() {
                   [current.trim(), linksToOffer.join(' ')].filter(Boolean).join(' ')
                 )
               }
-              className="text-xs text-indigo-700 underline mb-2 block text-left"
+              className="text-xs font-medium text-primary underline underline-offset-2 mb-2 block text-left"
             >
               Put {linksToOffer.length > 1 ? 'the removed links' : 'the removed link'} in the
               first comment
@@ -452,7 +454,7 @@ export default function ComposePage() {
             placeholder="First comment — posted as a reply once the tweet is live. Links are kept here."
             value={firstComment}
             onChange={(e) => setFirstComment(e.target.value)}
-            className="w-full border rounded-xl px-3 py-2 h-20 text-sm"
+            className="w-full border border-hairline bg-surface rounded-xl px-3 py-2 h-20 text-sm transition-colors focus:border-primary"
           />
 
           {thread.map((entry, i) => (
@@ -463,12 +465,12 @@ export default function ComposePage() {
                 onChange={(e) =>
                   setThread(thread.map((t, j) => (j === i ? e.target.value : t)))
                 }
-                className="flex-1 border rounded-xl px-3 py-2 h-16 text-sm"
+                className="flex-1 border border-hairline bg-surface rounded-xl px-3 py-2 h-16 text-sm transition-colors focus:border-primary"
               />
               <button
                 type="button"
                 onClick={() => setThread(thread.filter((_, j) => j !== i))}
-                className="text-xs text-black/40 underline self-start pt-2"
+                className="text-xs text-muted underline underline-offset-2 self-start pt-2 transition-colors hover:text-danger"
               >
                 Remove
               </button>
@@ -479,11 +481,11 @@ export default function ComposePage() {
             <button
               type="button"
               onClick={() => setThread([...thread, ''])}
-              className="text-xs text-indigo-700 underline"
+              className="text-xs font-medium text-primary underline underline-offset-2"
             >
               + Add a thread entry
             </button>
-            <span className="text-xs text-black/40">
+            <span className="text-xs text-muted">
               {firstComment.trim() || thread.length
                 ? `${(firstComment.trim() ? 1 : 0) + thread.length} ${
                     (firstComment.trim() ? 1 : 0) + thread.length === 1 ? 'reply' : 'replies'
@@ -492,12 +494,12 @@ export default function ComposePage() {
             </span>
           </div>
 
-          {xReplyError && <p className="text-xs text-red-600 mt-2">{xReplyError}</p>}
+          {xReplyError && <p className="text-xs text-danger mt-2">{xReplyError}</p>}
 
           {/* A reply is posted after the tweet is live, so it can fail on its
               own. Saying so here beats a surprise on the dashboard. */}
           {!xReplyError && hasXOptions && (
-            <p className="text-xs text-black/40 mt-2">
+            <p className="text-xs text-muted mt-2">
               Replies go out after the post itself. If one fails the post still
               stands, and the dashboard shows which reply did not.
             </p>
@@ -505,24 +507,24 @@ export default function ComposePage() {
         </div>
       )}
 
-      <label className="block text-sm font-medium mb-2">Schedule for later (optional)</label>
+      <label className="block text-sm font-medium text-ink mb-2">Schedule for later (optional)</label>
       <input
         type="datetime-local" value={scheduleAt}
         onChange={(e) => setScheduleAt(e.target.value)}
-        className="w-full border rounded-xl px-4 py-2.5 mb-2"
+        className="w-full border border-hairline bg-surface rounded-xl px-4 py-2.5 mb-2 transition-colors focus:border-primary"
       />
       {scheduleAt && (
-        <p className="text-xs text-black/40 mb-6">
+        <p className="text-xs text-muted mb-6">
           Posts at {new Date(scheduleAt).toLocaleString()} ({Intl.DateTimeFormat().resolvedOptions().timeZone})
         </p>
       )}
 
-      {message && <p className="text-sm text-red-600 mb-4 whitespace-pre-wrap">{message}</p>}
+      {message && <p className="text-sm text-danger bg-danger-soft border border-danger/25 rounded-xl px-4 py-3 mb-4 whitespace-pre-wrap">{message}</p>}
 
       <button
         onClick={handleSubmit}
         disabled={submitting || selected.length === 0 || blocked}
-        className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-xl disabled:opacity-50"
+        className="w-full bg-primary text-primary-fg font-semibold py-3 rounded-xl shadow-card transition-colors hover:bg-primary-hover disabled:opacity-50 disabled:hover:bg-primary"
       >
         {submitting ? 'Publishing…' : scheduleAt ? 'Schedule post' : 'Post now'}
       </button>

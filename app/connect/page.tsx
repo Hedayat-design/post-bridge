@@ -33,18 +33,18 @@ export default async function ConnectPage({
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-16">
-      <h1 className="text-2xl font-bold mb-1">Connected accounts</h1>
-      <p className="text-black/60 text-sm mb-8">
+      <h1 className="text-2xl font-bold text-ink mb-1">Connected accounts</h1>
+      <p className="text-muted text-sm mb-8">
         {connected?.length ?? 0} of {limit === Infinity ? 'unlimited' : limit} accounts connected on your {profile?.plan ?? 'free'} plan.
       </p>
 
       {searchParams.error && (
-        <p className="mb-6 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+        <p className="mb-6 text-sm text-danger bg-danger-soft border border-danger/25 rounded-xl px-4 py-3">
           {ERRORS[searchParams.error] ?? `Something went wrong (${searchParams.error}).`}
         </p>
       )}
       {searchParams.success && (
-        <p className="mb-6 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+        <p className="mb-6 text-sm text-success bg-success-soft border border-success/25 rounded-xl px-4 py-3">
           Account connected.
         </p>
       )}
@@ -57,28 +57,28 @@ export default async function ConnectPage({
           const available = platformAvailable(key)
 
           return (
-            <div key={key} className="flex items-center justify-between border rounded-xl px-5 py-4">
+            <div key={key} className="flex items-center justify-between border border-hairline bg-surface rounded-xl px-5 py-4 shadow-card transition-colors hover:border-hairline-strong">
               <div>
-                <span className="font-medium">{config.label}</span>
+                <span className="font-medium text-ink">{config.label}</span>
                 {!available && (
-                  <span className="ml-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                  <span className="ml-2 text-xs text-warning bg-warning-soft border border-warning/25 rounded-full px-2 py-0.5">
                     Coming soon
                   </span>
                 )}
               </div>
 
               {isConnected ? (
-                <span className="text-sm font-medium text-green-600">Connected ✓</span>
+                <span className="text-sm font-medium text-success">Connected ✓</span>
               ) : !available ? (
-                <span className="text-sm text-black/30">Not available yet</span>
+                <span className="text-sm text-faint">Not available yet</span>
               ) : atLimit ? (
-                <a href="/pricing" className="text-sm font-semibold text-indigo-600 underline">
+                <a href="/pricing" className="text-sm font-semibold text-primary underline underline-offset-2">
                   Upgrade to add more
                 </a>
               ) : (
                 <a
                   href={`/api/oauth/${key}`}
-                  className="text-sm font-semibold bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+                  className="text-sm font-semibold bg-primary text-primary-fg px-4 py-2 rounded-lg transition-colors hover:bg-primary-hover"
                 >
                   Connect
                 </a>

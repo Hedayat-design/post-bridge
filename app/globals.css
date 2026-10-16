@@ -2,6 +2,147 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * Colour tokens.
+ *
+ * Deep sapphire carries the brand, champagne gold appears only in small
+ * amounts (a rule, a badge, a focus ring) because gold stops reading as
+ * luxury the moment it covers an area, and warm porcelain keeps the
+ * neutrals from going clinical next to it.
+ *
+ * Every value is "R G B" channels rather than a hex string so Tailwind can
+ * apply opacity to it — `bg-surface/60` only works in that form.
+ *
+ * Semantic names, not colour names: pages say `text-muted` and `bg-surface`,
+ * so dark mode is this file's problem and not every component's.
+ */
+:root {
+  --bg: 250 250 248;
+  --surface: 255 255 255;
+  --surface-sunken: 244 244 240;
+  --border: 228 228 220;
+  --border-strong: 208 208 198;
+
+  --text: 15 23 51;
+  --text-muted: 91 100 128;
+  --text-faint: 139 147 171;
+
+  --primary: 44 66 172;
+  --primary-hover: 35 53 137;
+  --on-primary: 255 255 255;
+  --primary-soft: 238 242 255;
+
+  --accent: 176 131 57;
+  --accent-bright: 212 168 85;
+  --accent-soft: 250 244 232;
+
+  --success: 24 110 83;
+  --success-soft: 232 245 240;
+  --danger: 169 38 30;
+  --danger-soft: 253 238 237;
+  --warning: 146 106 44;
+  --warning-soft: 251 245 233;
+
+  --ring: 100 128 223;
+}
+
+/**
+ * Dark mode. Guarded with :not([data-theme="light"]) so an explicit light
+ * choice still wins over the system preference.
+ *
+ * The blues lighten rather than just darkening the background: a 44/66/172
+ * sapphire that reads as rich on porcelain turns into a muddy bruise on near
+ * black, so the primary moves up the ramp and the gold brightens with it.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: 7 11 28;
+    --surface: 14 20 48;
+    --surface-sunken: 20 27 61;
+    --border: 38 48 92;
+    --border-strong: 56 69 124;
+
+    --text: 232 235 245;
+    --text-muted: 154 164 196;
+    --text-faint: 118 128 162;
+
+    --primary: 74 100 212;
+    --primary-hover: 100 128 223;
+    --on-primary: 255 255 255;
+    --primary-soft: 22 32 78;
+
+    --accent: 227 194 126;
+    --accent-bright: 240 217 168;
+    --accent-soft: 38 30 14;
+
+    --success: 93 195 158;
+    --success-soft: 11 43 34;
+    --danger: 240 143 136;
+    --danger-soft: 54 20 18;
+    --warning: 227 194 126;
+    --warning-soft: 45 35 14;
+
+    --ring: 127 154 240;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: 7 11 28;
+  --surface: 14 20 48;
+  --surface-sunken: 20 27 61;
+  --border: 38 48 92;
+  --border-strong: 56 69 124;
+
+  --text: 232 235 245;
+  --text-muted: 154 164 196;
+  --text-faint: 118 128 162;
+
+  --primary: 74 100 212;
+  --primary-hover: 100 128 223;
+  --on-primary: 255 255 255;
+  --primary-soft: 22 32 78;
+
+  --accent: 227 194 126;
+  --accent-bright: 240 217 168;
+  --accent-soft: 38 30 14;
+
+  --success: 93 195 158;
+  --success-soft: 11 43 34;
+  --danger: 240 143 136;
+  --danger-soft: 54 20 18;
+  --warning: 227 194 126;
+  --warning-soft: 45 35 14;
+
+  --ring: 127 154 240;
+}
+
+/**
+ * An explicit background and foreground. Without these the page inherited the
+ * browser's canvas while the text stayed black, so a dark-mode viewer got
+ * black text on a black page.
+ */
 body {
   font-family: 'Inter', system-ui, sans-serif;
+  background-color: rgb(var(--bg));
+  color: rgb(var(--text));
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Form controls default to the browser's own light palette otherwise. */
+input,
+textarea,
+select {
+  color: inherit;
+  background-color: rgb(var(--surface));
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgb(var(--text-faint));
+}
+
+/* One visible focus ring everywhere, rather than the browser's per-control default. */
+:where(a, button, input, textarea, select):focus-visible {
+  outline: 2px solid rgb(var(--ring));
+  outline-offset: 2px;
 }

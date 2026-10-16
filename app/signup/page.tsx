@@ -36,22 +36,22 @@ export default function SignupPage() {
 
   return (
     <div className="max-w-sm mx-auto px-6 py-24">
-      <h1 className="text-2xl font-bold mb-6">Create your account</h1>
+      <h1 className="text-2xl font-bold text-ink mb-6">Create your account</h1>
       <form onSubmit={handleSignup} className="space-y-4">
         <input
           type="email" required placeholder="Email" value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border rounded-lg px-4 py-2.5"
+          className="w-full border border-hairline bg-surface rounded-lg px-4 py-2.5 transition-colors focus:border-primary"
         />
         <input
           type="password" required placeholder="Password" value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border rounded-lg px-4 py-2.5"
+          className="w-full border border-hairline bg-surface rounded-lg px-4 py-2.5 transition-colors focus:border-primary"
         />
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
         <button
           type="submit" disabled={loading}
-          className="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-lg disabled:opacity-50"
+          className="w-full bg-primary text-primary-fg font-semibold py-2.5 rounded-lg shadow-card transition-colors hover:bg-primary-hover disabled:opacity-50"
         >
           {loading ? 'Creating account…' : 'Sign up'}
         </button>

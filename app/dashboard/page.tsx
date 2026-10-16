@@ -46,54 +46,54 @@ export default async function DashboardPage() {
     <div className="max-w-5xl mx-auto px-6 py-16">
       <div className="flex items-center justify-between mb-10">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-sm text-black/50">
+          <h1 className="text-2xl font-bold text-ink">Dashboard</h1>
+          <p className="text-sm text-muted">
             {accounts?.length ?? 0} accounts connected · {profile?.plan ?? 'free'} plan
           </p>
         </div>
-        <Link href="/compose" className="bg-indigo-600 text-white font-semibold px-5 py-2.5 rounded-lg">
+        <Link href="/compose" className="bg-primary text-primary-fg font-semibold px-5 py-2.5 rounded-lg shadow-card transition-colors hover:bg-primary-hover">
           + New post
         </Link>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
-        <div className="border rounded-2xl p-6">
-          <h2 className="font-semibold mb-4">Scheduled Posts</h2>
+        <div className="border border-hairline bg-surface rounded-2xl p-6 shadow-card min-w-0">
+          <h2 className="font-semibold text-ink mb-4">Scheduled Posts</h2>
           <div className="space-y-3">
             {(scheduled?.length ?? 0) === 0 && (
-              <p className="text-sm text-black/40">Nothing scheduled yet.</p>
+              <p className="text-sm text-faint">Nothing scheduled yet.</p>
             )}
             {scheduled?.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
-                <span className="text-xs font-semibold text-indigo-600 w-28 shrink-0">
+              <div key={p.id} className="flex items-center gap-3 bg-sunken rounded-xl p-3">
+                <span className="text-xs font-semibold text-primary w-28 shrink-0">
                   {p.scheduled_for ? format(new Date(p.scheduled_for), 'MMM d, h:mm a') : '—'}
                 </span>
-                <span className="text-sm truncate">{p.caption || `(${p.media_type} post)`}</span>
+                <span className="text-sm text-ink truncate min-w-0">{p.caption || `(${p.media_type} post)`}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="border rounded-2xl p-6">
-          <h2 className="font-semibold mb-4">Live Posts</h2>
+        <div className="border border-hairline bg-surface rounded-2xl p-6 shadow-card min-w-0">
+          <h2 className="font-semibold text-ink mb-4">Live Posts</h2>
           <div className="space-y-3">
             {(live?.length ?? 0) === 0 && (
-              <p className="text-sm text-black/40">Nothing posted yet.</p>
+              <p className="text-sm text-faint">Nothing posted yet.</p>
             )}
             {live?.map((p: any) => (
-              <div key={p.id} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
-                <span className="text-xs font-semibold text-orange-600 w-24 shrink-0">
+              <div key={p.id} className="flex items-center gap-3 bg-sunken rounded-xl p-3">
+                <span className="text-xs font-semibold text-accent w-24 shrink-0">
                   {format(new Date(p.created_at), 'MMM d')}
                 </span>
-                <span className="text-sm truncate flex-1">{p.caption || `(${p.media_type} post)`}</span>
-                <span className="text-xs text-black/40">
+                <span className="text-sm text-ink truncate flex-1 min-w-0">{p.caption || `(${p.media_type} post)`}</span>
+                <span className="text-xs text-muted">
                   {delivered(p).length}/{p.post_targets?.length ?? 0} ✓
                 </span>
                 {/* A partial target is live, so it counts above — but the
                     reply that failed under it has to be visible somewhere, or
                     the row reads as a clean success. */}
                 {partialNote(p) && (
-                  <span className="text-xs text-amber-600" title={partialNote(p)!}>
+                  <span className="text-xs text-warning" title={partialNote(p)!}>
                     ⚠ reply failed
                   </span>
                 )}

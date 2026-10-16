@@ -24,22 +24,49 @@ export default function PricingPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-20">
-      <h1 className="text-3xl font-bold text-center mb-2">Get more views, with less effort.</h1>
-      <p className="text-center text-black/50 mb-14">2 months free — billed annually.</p>
+      <h1 className="text-3xl font-bold text-center text-ink mb-2">Get more views, with less effort.</h1>
+      <p className="text-center text-muted mb-14">2 months free — billed annually.</p>
 
       <div className="grid md:grid-cols-3 gap-6">
         {plans.map((p) => (
-          <div key={p.key} className={`rounded-2xl border p-8 flex flex-col ${p.popular ? 'bg-black text-white' : 'bg-white'}`}>
+          <div
+            key={p.key}
+            className={`relative rounded-2xl border p-8 flex flex-col ${
+              p.popular
+                ? // The featured tier is the one place gold covers real area,
+                  // and it sits on deep sapphire rather than the page itself.
+                  'border-accent/40 bg-sapphire-900 text-white shadow-lift'
+                : 'border-hairline bg-surface text-ink shadow-card'
+            }`}
+          >
+            {p.popular && (
+              <span className="absolute -top-3 left-8 rounded-full bg-accent-bright px-3 py-1 text-xs font-semibold tracking-wide text-sapphire-950">
+                Most popular
+              </span>
+            )}
+
             <h3 className="font-bold text-lg mb-1">{p.name}</h3>
-            <p className={`text-sm mb-6 ${p.popular ? 'text-white/60' : 'text-black/60'}`}>{p.blurb}</p>
-            <div className="text-4xl font-bold mb-6">${p.price}<span className="text-base font-medium opacity-50">/mo</span></div>
+            <p className={`text-sm mb-6 ${p.popular ? 'text-white/65' : 'text-muted'}`}>{p.blurb}</p>
+            <div className="text-4xl font-bold mb-6">
+              ${p.price}
+              <span className={`text-base font-medium ${p.popular ? 'text-white/50' : 'text-faint'}`}>/mo</span>
+            </div>
             <ul className="text-sm space-y-2.5 mb-8 flex-1">
-              {p.features.map((f) => <li key={f}>✓ {f}</li>)}
+              {p.features.map((f) => (
+                <li key={f} className="flex gap-2">
+                  <span className={p.popular ? 'text-accent-bright' : 'text-accent'}>✓</span>
+                  <span className={p.popular ? 'text-white/85' : 'text-muted'}>{f}</span>
+                </li>
+              ))}
             </ul>
             <button
               onClick={() => upgrade(p.key)}
               disabled={loadingPlan === p.key}
-              className={`py-3 rounded-full font-semibold ${p.popular ? 'bg-indigo-500 text-white' : 'bg-black text-white'} disabled:opacity-50`}
+              className={`py-3 rounded-full font-semibold transition-colors disabled:opacity-50 ${
+                p.popular
+                  ? 'bg-accent-bright text-sapphire-950 hover:bg-champagne-200'
+                  : 'bg-primary text-primary-fg hover:bg-primary-hover'
+              }`}
             >
               {loadingPlan === p.key ? 'Redirecting…' : 'Start posting instantly'}
             </button>

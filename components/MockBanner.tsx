@@ -10,7 +10,7 @@ export function MockBanner() {
   if (!enabled) return null
 
   return (
-    <div className="bg-amber-400 text-amber-950 text-sm font-medium px-4 py-2 text-center">
+    <div className="bg-accent-bright text-sapphire-950 text-sm font-medium px-4 py-2 text-center">
       Demo mode — accounts are simulated and nothing is published to any real
       platform.
     </div>
