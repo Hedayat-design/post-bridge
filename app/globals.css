@@ -3,132 +3,168 @@
 @tailwind utilities;
 
 /**
- * Colour tokens.
+ * Navy & Gold.
  *
- * Deep sapphire carries the brand, champagne gold appears only in small
- * amounts (a rule, a badge, a focus ring) because gold stops reading as
- * luxury the moment it covers an area, and warm porcelain keeps the
- * neutrals from going clinical next to it.
+ * The five brand colours, used exactly as specified:
+ *   Navy Blue      #0D1B2A
+ *   Ocean Blue     #1B365D
+ *   Antique Gold   #C99A47
+ *   Champagne Gold #E6C17A
+ *   Ivory          #F5EBDD
  *
- * Every value is "R G B" channels rather than a hex string so Tailwind can
- * apply opacity to it — `bg-surface/60` only works in that form.
+ * Navy carries the surfaces, ivory carries the text, and gold is the accent.
+ * Gold never covers large areas: it is a rule, a border, a single button. The
+ * moment it becomes a background it stops reading as gold and starts reading
+ * as mustard.
  *
- * Semantic names, not colour names: pages say `text-muted` and `bg-surface`,
- * so dark mode is this file's problem and not every component's.
+ * Values are "R G B" channels, not hex, so Tailwind's opacity modifiers work
+ * (`bg-surface/60`). A plain var() silently ignores the slash.
  */
 :root {
-  --bg: 250 250 248;
-  --surface: 255 255 255;
-  --surface-sunken: 244 244 240;
-  --border: 228 228 220;
-  --border-strong: 208 208 198;
+  /* ---- Light: ivory paper, navy ink ---- */
+  --bg: 245 235 221;            /* Ivory #F5EBDD */
+  --surface: 255 251 244;       /* lifted off the ivory so cards read */
+  --surface-sunken: 239 227 210;
+  --border: 224 210 190;
+  --border-strong: 205 188 162;
 
-  --text: 15 23 51;
-  --text-muted: 91 100 128;
-  --text-faint: 139 147 171;
+  --text: 13 27 42;             /* Navy #0D1B2A */
+  --text-muted: 74 91 112;
+  --text-faint: 125 138 155;
 
-  --primary: 44 66 172;
-  --primary-hover: 35 53 137;
-  --on-primary: 255 255 255;
-  --primary-soft: 238 242 255;
+  /* Ocean blue leads on ivory: a gold button on ivory has too little
+     separation from the page to read as a primary action. */
+  --primary: 27 54 93;          /* Ocean Blue #1B365D */
+  --primary-hover: 13 27 42;    /* Navy #0D1B2A */
+  --on-primary: 245 235 221;    /* Ivory */
+  --primary-soft: 228 234 242;
 
-  --accent: 176 131 57;
-  --accent-bright: 212 168 85;
-  --accent-soft: 250 244 232;
+  /* Antique gold is too light for text on ivory, so accent *text* darkens
+     while the decorative fills keep the true brand gold. */
+  --accent: 138 100 36;
+  --accent-bright: 201 154 71;  /* Antique Gold #C99A47 */
+  --accent-soft: 247 239 224;
 
   --success: 24 110 83;
   --success-soft: 232 245 240;
-  --danger: 169 38 30;
-  --danger-soft: 253 238 237;
-  --warning: 146 106 44;
-  --warning-soft: 251 245 233;
+  --danger: 158 42 34;
+  --danger-soft: 250 236 234;
+  --warning: 138 100 36;
+  --warning-soft: 247 239 224;
 
-  --ring: 100 128 223;
+  --ring: 201 154 71;
 }
 
 /**
- * Dark mode. Guarded with :not([data-theme="light"]) so an explicit light
- * choice still wins over the system preference.
- *
- * The blues lighten rather than just darkening the background: a 44/66/172
- * sapphire that reads as rich on porcelain turns into a muddy bruise on near
- * black, so the primary moves up the ramp and the gold brightens with it.
+ * Dark is the brand's own register: navy ground, ivory text, gold accents —
+ * the palette as shown. Guarded with :not([data-theme="light"]) so an
+ * explicit light choice still wins over the system preference.
  */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: 7 11 28;
-    --surface: 14 20 48;
-    --surface-sunken: 20 27 61;
-    --border: 38 48 92;
-    --border-strong: 56 69 124;
+    --bg: 13 27 42;             /* Navy #0D1B2A */
+    --surface: 18 35 57;        /* navy lifted toward ocean */
+    --surface-sunken: 10 22 34;
+    --border: 34 61 95;
+    --border-strong: 46 82 128;
 
-    --text: 232 235 245;
-    --text-muted: 154 164 196;
-    --text-faint: 118 128 162;
+    --text: 245 235 221;        /* Ivory #F5EBDD */
+    --text-muted: 169 182 201;
+    --text-faint: 116 131 155;
 
-    --primary: 74 100 212;
-    --primary-hover: 100 128 223;
-    --on-primary: 255 255 255;
-    --primary-soft: 22 32 78;
+    /* On navy the gold finally gets to be the primary action. */
+    --primary: 201 154 71;      /* Antique Gold #C99A47 */
+    --primary-hover: 230 193 122; /* Champagne Gold #E6C17A */
+    --on-primary: 13 27 42;     /* Navy */
+    --primary-soft: 42 33 18;
 
-    --accent: 227 194 126;
+    --accent: 230 193 122;      /* Champagne Gold #E6C17A */
     --accent-bright: 240 217 168;
-    --accent-soft: 38 30 14;
+    --accent-soft: 42 33 18;
 
     --success: 93 195 158;
     --success-soft: 11 43 34;
     --danger: 240 143 136;
     --danger-soft: 54 20 18;
-    --warning: 227 194 126;
-    --warning-soft: 45 35 14;
+    --warning: 230 193 122;
+    --warning-soft: 42 33 18;
 
-    --ring: 127 154 240;
+    --ring: 230 193 122;
   }
 }
 
-:root[data-theme='dark'] {
-  --bg: 7 11 28;
-  --surface: 14 20 48;
-  --surface-sunken: 20 27 61;
-  --border: 38 48 92;
-  --border-strong: 56 69 124;
+/* The landing page opts the whole document — nav and footer included — into
+   the dark register whatever the visitor's OS theme: a starfield on ivory is
+   not a starfield. Team mode's picker and the admin dashboard opt in the same
+   way through .force-dark. :has() lets a page do that without the root layout
+   knowing which page it renders, and wrapping it in :is() keeps the list
+   forgiving, so a browser without :has() still honours data-theme. */
+:root:is([data-theme='dark'], :has(.space-page), :has(.force-dark)) {
+  --bg: 13 27 42;
+  --surface: 18 35 57;
+  --surface-sunken: 10 22 34;
+  --border: 34 61 95;
+  --border-strong: 46 82 128;
 
-  --text: 232 235 245;
-  --text-muted: 154 164 196;
-  --text-faint: 118 128 162;
+  --text: 245 235 221;
+  --text-muted: 169 182 201;
+  --text-faint: 116 131 155;
 
-  --primary: 74 100 212;
-  --primary-hover: 100 128 223;
-  --on-primary: 255 255 255;
-  --primary-soft: 22 32 78;
+  --primary: 201 154 71;
+  --primary-hover: 230 193 122;
+  --on-primary: 13 27 42;
+  --primary-soft: 42 33 18;
 
-  --accent: 227 194 126;
+  --accent: 230 193 122;
   --accent-bright: 240 217 168;
-  --accent-soft: 38 30 14;
+  --accent-soft: 42 33 18;
 
   --success: 93 195 158;
   --success-soft: 11 43 34;
   --danger: 240 143 136;
   --danger-soft: 54 20 18;
-  --warning: 227 194 126;
-  --warning-soft: 45 35 14;
+  --warning: 230 193 122;
+  --warning-soft: 42 33 18;
 
-  --ring: 127 154 240;
+  --ring: 230 193 122;
 }
 
-/**
- * An explicit background and foreground. Without these the page inherited the
- * browser's canvas while the text stayed black, so a dark-mode viewer got
- * black text on a black page.
- */
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  /* The variables come from next/font in app/layout.tsx; the fallbacks keep
+     the page readable if a font request ever fails. */
+  font-family: var(--font-body), system-ui, -apple-system, sans-serif;
   background-color: rgb(var(--bg));
   color: rgb(var(--text));
   -webkit-font-smoothing: antialiased;
 }
 
-/* Form controls default to the browser's own light palette otherwise. */
+/* The serif is the luxury signal. Reserved for display headings — set a
+   paragraph in it and the page reads as a wedding invitation. */
+.font-display {
+  font-family: var(--font-display), Georgia, 'Times New Roman', serif;
+  letter-spacing: -0.015em;
+}
+
+/* A hairline that fades at both ends, the way a foil rule does on print. */
+.rule-gold {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgb(var(--accent-bright) / 0.7),
+    transparent
+  );
+}
+
+/* The gold-fleck wash from the brand imagery, kept faint enough to sit
+   under text. Two offset radial gradients rather than an image, so it
+   costs nothing and scales to any viewport. */
+.starfield {
+  background-image:
+    radial-gradient(circle at 18% 22%, rgb(var(--accent-bright) / 0.10), transparent 42%),
+    radial-gradient(circle at 82% 8%, rgb(var(--primary) / 0.14), transparent 46%);
+}
+
 input,
 textarea,
 select {
@@ -141,8 +177,106 @@ textarea::placeholder {
   color: rgb(var(--text-faint));
 }
 
-/* One visible focus ring everywhere, rather than the browser's per-control default. */
 :where(a, button, input, textarea, select):focus-visible {
   outline: 2px solid rgb(var(--ring));
   outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Landing page: deep space
+ *
+ * Three fixed layers behind the content, driven by components/landing/
+ * SpaceScene.tsx. Negative z-index puts them under the page's in-flow content
+ * but above the body's navy, with no wrapper needing a stacking context.
+ * ------------------------------------------------------------------------- */
+
+.space-photo {
+  position: fixed;
+  inset: -12%;
+  z-index: -30;
+  pointer-events: none;
+  background: url('/landing/milky-way.webp') center / cover no-repeat;
+  opacity: 0.8;
+  transform: rotate(-6deg) scale(1.1);
+  will-change: transform, opacity;
+}
+
+/* Pulls the photograph's royal blue toward the brand navy at the edges, so
+   the sky belongs to the page rather than sitting on it like a wallpaper. */
+.space-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: -20;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 85% 75% at 50% 42%, transparent 0%, rgb(13 27 42 / 0.5) 68%, rgb(13 27 42 / 0.94) 100%),
+    linear-gradient(to bottom, rgb(13 27 42 / 0.2), rgb(13 27 42 / 0.45));
+}
+
+.space-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Reveals. Only armed once the scene has mounted (.motion-ready), so the
+   page is fully readable without JavaScript. */
+.motion-ready [data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 28px, 0);
+  filter: blur(6px);
+  transition:
+    opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 1.1s cubic-bezier(0.2, 0.7, 0.2, 1),
+    filter 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--d, 0) * 90ms);
+}
+
+.motion-ready [data-reveal][data-visible='true'] {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+/* Scroll-read statements: --read runs 0 → 1 as the block passes, and word i
+   of n lights up once the reader has got that far. */
+[data-read] .read-word {
+  opacity: clamp(0.16, calc(var(--read, 1) * var(--n) - var(--i)), 1);
+  transition: opacity 0.18s linear;
+}
+
+/* A soft band of navy behind long copy: legibility without a card edge. */
+.copy-scrim {
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(13 27 42 / 0.5) 14%,
+    rgb(13 27 42 / 0.5) 86%,
+    transparent
+  );
+}
+
+.scroll-cue {
+  animation: scroll-cue 2.4s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+  transform-origin: top;
+}
+
+@keyframes scroll-cue {
+  0% { transform: scaleY(0); opacity: 0; }
+  30% { transform: scaleY(1); opacity: 1; }
+  100% { transform: scaleY(1) translateY(100%); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-ready [data-reveal] {
+    transform: none;
+    filter: none;
+    transition: opacity 0.4s linear;
+  }
+  .scroll-cue {
+    animation: none;
+  }
 }

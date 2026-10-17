@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
+import { actingMemberId, forbidUnless, logActivity } from '@/lib/team/access'
 import { LIMITS, sanitizePlatformOptions, validateXReplies } from '@/lib/adapters/limits'
 import {
   preflightResolvedTarget,
@@ -16,6 +17,8 @@ export async function POST(request: NextRequest) {
   // whatever is in the cookie.
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  const refused = await forbidUnless('post')
+  if (refused) return refused
 
   const body = await request.json()
   const {
@@ -160,6 +163,7 @@ export async function POST(request: NextRequest) {
     .from('posts')
     .insert({
       user_id: user.id,
+      created_by: await actingMemberId(),
       caption,
       media_urls: mediaUrls,
       media_type: mediaType,
@@ -177,6 +181,12 @@ export async function POST(request: NextRequest) {
   const targets = socialAccountIds.map((id) => ({ post_id: post.id, social_account_id: id }))
   const { error: targetsError } = await supabase.from('post_targets').insert(targets)
   if (targetsError) return NextResponse.json({ error: targetsError.message }, { status: 500 })
+
+  await logActivity(supabase, scheduledFor ? 'post.scheduled' : 'post.published', {
+    postId: post.id,
+    targets: socialAccountIds.length,
+    scheduledFor,
+  })
 
   // If posting immediately, publish inline so the caller gets the real result
   // instead of a success that may not have happened.

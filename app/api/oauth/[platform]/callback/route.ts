@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PLATFORMS, Platform, PLAN_LIMITS, PlatformConfig } from '@/lib/platforms'
-import { supabaseAdmin } from '@/lib/supabase/server'
+import { supabaseAdmin, supabaseServer } from '@/lib/supabase/server'
+import { logActivity } from '@/lib/team/access'
 import { adapters } from '@/lib/adapters'
 import { mockModeEnabled, mockAccessToken } from '@/lib/adapters/mock'
 import { openState, OAUTH_COOKIE } from '@/lib/oauth'
@@ -133,6 +134,12 @@ export async function GET(
   )
 
   if (upsertError) return fail(request, 'account_save_failed')
+
+  // Through the caller's own session, so the row lands in their workspace.
+  await logActivity(supabaseServer(), 'account.connected', {
+    platform,
+    name: profileInfo.displayName ?? profileInfo.platformAccountId,
+  })
 
   const response = NextResponse.redirect(new URL('/connect?success=1', request.url))
   response.cookies.delete(OAUTH_COOKIE)

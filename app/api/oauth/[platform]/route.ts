@@ -4,6 +4,7 @@ import { PLATFORMS, Platform } from '@/lib/platforms'
 import { supabaseServer } from '@/lib/supabase/server'
 import { createPkcePair, sealState, OAUTH_COOKIE, stateCookieOptions } from '@/lib/oauth'
 import { mockModeEnabled } from '@/lib/adapters/mock'
+import { forbidUnless } from '@/lib/team/access'
 
 export async function GET(
   request: NextRequest,
@@ -22,6 +23,8 @@ export async function GET(
   if (!user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
+  const refused = await forbidUnless('manage_accounts')
+  if (refused) return refused
 
   const nonce = crypto.randomBytes(16).toString('hex')
   const { verifier, challenge } = createPkcePair()

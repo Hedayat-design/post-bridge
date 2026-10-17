@@ -188,6 +188,35 @@ things it does deliberately:
 the same reasoning as a stray caption override: it would silently never be
 posted, and the user would wonder why their link never appeared.
 
+### Beyond upstream: AI caption generation
+Not a gap we copied — upstream has no equivalent. A post's image is sent to a
+vision model through OpenRouter and each selected platform gets its own
+caption, written in the user's voice.
+
+- **The voice lives in the database**, per user and per platform
+  (`platform_styles`, migration 0007), edited at `/styles`. Prompts in source
+  would mean a deploy per adjustment and one shared voice for everybody.
+- **Examples over adjectives.** A model told to "write like a top performer"
+  produces the average of the internet. The user's own posts are the only
+  thing that reliably carries a voice, so examples are the primary input and
+  the instructions are a steer on top. `lib/ai/prompt.ts` orders the system
+  prompt so the user's instructions come *after* our platform note, because
+  when the two disagree the user's wording should be what the model read last.
+- **Generated captions are ordinary platform overrides.** They are written
+  into `platform_configurations`, so a generated caption is validated,
+  edited and published by exactly the same path as one typed by hand, and the
+  publish route needed no changes at all.
+- **The model is per platform**, a plain OpenRouter slug on each style row, so
+  a long-form LinkedIn post and a 280-character tweet can use different models
+  and either can be swapped without a deploy.
+- **Cost is capped per plan.** Generation bills to the app's own OpenRouter
+  key, so `caption_generations` logs every attempt and the month's row count
+  is the cap (`lib/ai/quota.ts`). Failed attempts count: they cost tokens
+  upstream, and excluding them would make a broken model slug a free
+  unlimited loop.
+- **Nothing generates or publishes on its own.** Generation is on a button and
+  every caption is read by a human before it posts.
+
 ### 5. Media as a first-class resource
 They have `/v1/media` with `POST /v1/media/create-upload-url`
 (`mime_type`, `size_bytes`, `name`) — the client uploads straight to storage and

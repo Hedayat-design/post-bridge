@@ -38,37 +38,28 @@ module.exports = {
         danger: { DEFAULT: token('danger'), soft: token('danger-soft') },
         warning: { DEFAULT: token('warning'), soft: token('warning-soft') },
 
-        // The raw ramp, for the few places that want a specific step rather
-        // than a role — the hero wash, mostly.
-        sapphire: {
-          50: '#eef2ff',
-          100: '#dee6fb',
-          200: '#bfcdf6',
-          300: '#93a9ed',
-          400: '#6480df',
-          500: '#3f5bcb',
-          600: '#2c42ac',
-          700: '#233589',
-          800: '#1b2968',
-          900: '#141e4c',
-          950: '#070b1c',
-        },
-        champagne: {
-          100: '#faf4e8',
-          200: '#f0d9a8',
-          300: '#e3c27e',
-          400: '#d4a855',
-          500: '#b08339',
-          600: '#8a6524',
-        },
+        // The five brand colours by name, for the few places that want a
+        // specific one rather than a role — the navy pricing card, the gold
+        // foil rule. Everything else should use the semantic tokens above.
+        navy: '#0D1B2A',
+        ocean: '#1B365D',
+        antique: '#C99A47',
+        champagne: '#E6C17A',
+        ivory: '#F5EBDD',
       },
       borderColor: { DEFAULT: token('border') },
       ringColor: { DEFAULT: token('ring') },
+      fontFamily: {
+        display: ['var(--font-display)'],
+        sans: ['var(--font-body)'],
+      },
       boxShadow: {
-        // Tinted with the brand navy instead of neutral black, so cards sit on
-        // the porcelain background rather than looking cut out of it.
-        card: '0 1px 2px rgb(15 23 51 / 0.04), 0 8px 24px -12px rgb(15 23 51 / 0.12)',
-        lift: '0 2px 4px rgb(15 23 51 / 0.06), 0 16px 40px -16px rgb(15 23 51 / 0.22)',
+        // Tinted with the brand navy rather than neutral black, so a card sits
+        // on the page instead of looking cut out of it.
+        card: '0 1px 2px rgb(13 27 42 / 0.05), 0 8px 24px -12px rgb(13 27 42 / 0.16)',
+        lift: '0 2px 4px rgb(13 27 42 / 0.08), 0 18px 44px -16px rgb(13 27 42 / 0.28)',
+        // For the gold primary button: a warm glow rather than a grey drop.
+        gold: '0 1px 2px rgb(201 154 71 / 0.20), 0 10px 30px -12px rgb(201 154 71 / 0.45)',
       },
     },
   },
